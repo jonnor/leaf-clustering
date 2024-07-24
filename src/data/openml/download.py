@@ -15,8 +15,9 @@ def download_openml_cc18(out_dir):
     Takes around 400 MB on disk in total.
     """
 
-    if not os.path.exists(out_dir):
-        os.makedirs(out_dir)
+    datasets_dir = os.path.join(out_dir, 'datasets')
+    if not os.path.exists(datasets_dir):
+        os.makedirs(datasets_dir)
 
     tasks_path = os.path.join(out_dir, 'tasks.csv')
 
@@ -55,7 +56,7 @@ def download_openml_cc18(out_dir):
         data = X.copy()
         data['__target'] = y
 
-        data.to_parquet(os.path.join(out_dir, 'datasets', f'{dataset_id}.parquet'))
+        data.to_parquet(os.path.join(datasets_dir, f'{dataset_id}.parquet'))
 
 
 if __name__ == '__main__':
