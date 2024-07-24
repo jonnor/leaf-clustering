@@ -16,7 +16,7 @@ from sklearn.cluster import KMeans
 from sklearn.base import BaseEstimator, ClassifierMixin
 import scipy.special
 
-from parallel import ProgressParallel, joblib
+from ..utils.parallel import ProgressParallel, joblib
 
 from emlearn.preprocessing.quantizer import Quantizer
 import emlearn
@@ -387,9 +387,11 @@ def ensure_dir(p):
 def run_datasets(pipeline, out_dir, run_id, quantizer=None, kvs={}, dataset_dir=None, **kwargs):
 
     if dataset_dir is None:
-        dataset_dir = 'data/raw/openml-cc18'
+        dataset_dir = 'data/raw/openml-cc18/datasets'
 
-    for no, f in enumerate(glob.glob('*.parquet', root_dir=dataset_dir)):
+    matches = glob.glob('*.parquet', root_dir=dataset_dir)
+    assert len(matches) == 63, len(matches)
+    for no, f in enumerate(matches):
         dataset_id = os.path.splitext(f)[0]
         dataset_path = os.path.join(dataset_dir, f)
 
@@ -486,6 +488,10 @@ def main():
 
     optimizers = [ {'quantize': q, 'cluster': c} for q in quantizers for c in clusters ]
 
+
+    out_dir = 'output/results/experiments.parquet'
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
     for experiment, config in experiments.items():
 
         log.info('experiment-start', experiment=experiment, **config)
@@ -509,9 +515,10 @@ def main():
 
         run_id = uuid.uuid4().hex.upper()[0:6] + f'_{experiment}'
 
-        run_datasets(p, quantizer=quantizer, optimizers=optimizers, kvs=dict(experiment=experiment), out_dir='out.parquet', run_id=run_id, repetitions=5, cv=5)
+        run_datasets(p, quantizer=quantizer, optimizers=optimizers, kvs=dict(experiment=experiment), out_dir=out_dir, run_id=run_id, repetitions=5, cv=5)
 
 
+    print('Results written to', out_dir)
 
 if __name__ == '__main__':
     main()
