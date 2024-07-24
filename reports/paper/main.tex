@@ -22,7 +22,7 @@
 \begin{document}
 
 %% Title
-\title{PRELIMINARY. Leaf compression for tiny Random Forests}
+\title{(preliminary title) Leaf compression for tiny Random Forests}
 
 %% Author info
 \author{
@@ -41,34 +41,91 @@
 \begin{abstract}	\noindent
 
 % Keywords. Maximum 5
-\noindent \textbf{Keywords}: 
+\noindent \textbf{Keywords}: Random Forest, TinyML, model compression, tree-based ensemble
 
 \end{abstract}
 
 
 \section{Introduction}
 
+Big picture motivation.
 
 \noindent
 
 \newpage
 \section{Background}
 
+TinyML setting. On device inference. Low power. Wireless sensing.
+Success cases for Random Forest in TinyML.
+Human Activity Recognition. \cite{elsts_are_2021}
+Animal behavior. \cite{tatler_high_2018} \cite{kleanthous_feature_2020} \cite{tran_iot-based_2022}
+Battery monitoring. \cite{mawonou_state--health_2021}
+
+Structure of a random forest.
+Decision nodes, leaf nodes.
+Voting rules. argmax / Hard majority.
+Probability average. Soft.
+
+Fully grown versus partially grown trees.
 
 \subsection{Related work}
+
+Optimization techiques for decision trees and decision tree ensembles like Random Forest.
+Integer quantization of features.
+FPGA/hardware related.
+SIMD tree evaluation.
+
+Optimization for microcontrollers \cite{tabanelli_optimizing_2022}
+Feature selection. \cite{uddin_guided_2015}, \cite{elsts_energy-efficient_2020}
+Early stopping. \cite{daghero_low-overhead_2022} \cite{daghero_adaptive_2021}
+Parallelization.
+Cache-awareness.
+
+Software tools for deploying RF to TinyML. Open-source
 
 
 \section{Methods}
 
+What we cover: Feature quantization. Leaf quantization. Leaf clustering.
+
+
+
+OpenML CC18 datasets.
+Selected / eliminated datasets.
+TODO: list exact identifiers for that which was eliminated
+
+Train a general model. Using scikit-learn.
+
+Apply compression strategy to trained model. Re-running predictions on test set.
+
+Cross validation.
+
+? Demonstrator of performance on one or few TinyML datasets.
+PAMAP.
+Comparisons with other frameworks. 
+
+\footnote{The code for reproducing the experiments can be found at https://github.com/jonnor/leaf-quantization}
 
 \newpage
 \section{Results}
 
+Performance with 16bit and 8 bit feature quantization, vs floating point.
+
+
+Percentage of model space (bytes) used for leaves.
+Histogram over models from all the datasets. Using 16 bit 
+For float (no quantization), uint16 and uint8 quantization (with deduplication).
+Determines the saving potential we have.
+
+? claim. Model size is the typical main contraint for RF in TinyML settings. Execution time is less of a problem
 
 %% DISCUSSION
 \section{Discussion}
 
 \subsection{Further work}
+
+Leaf clustering for regression.
+
 
 %\newpage
 \section{Conclusions}
@@ -77,6 +134,7 @@
 \section*{Acknowledgements}
 \noindent
 
+Martin Stensgård
 
 % References
 \newpage
