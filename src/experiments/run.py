@@ -387,7 +387,7 @@ def ensure_dir(p):
 def run_datasets(pipeline, out_dir, run_id, quantizer=None, kvs={}, dataset_dir=None, **kwargs):
 
     if dataset_dir is None:
-        dataset_dir = 'data/datasets'
+        dataset_dir = 'data/raw/openml-cc18'
 
     for no, f in enumerate(glob.glob('*.parquet', root_dir=dataset_dir)):
         dataset_id = os.path.splitext(f)[0]

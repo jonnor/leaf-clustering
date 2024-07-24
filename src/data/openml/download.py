@@ -57,4 +57,4 @@ def download_openml_cc18(out_dir):
 
 
 if __name__ == '__main__':
-    download_openml_cc18('data')
+    download_openml_cc18('data/raw/openml-cc18')
