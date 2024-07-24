@@ -15,7 +15,9 @@ def download_openml_cc18(out_dir):
     Takes around 400 MB on disk in total.
     """
 
-    # FIXME: create directories as needed
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+
     tasks_path = os.path.join(out_dir, 'tasks.csv')
 
     if os.path.exists(tasks_path):
