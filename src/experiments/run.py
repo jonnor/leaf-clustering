@@ -370,32 +370,38 @@ def run_datasets(pipeline, out_dir, run_id, quantizer=None, kvs={}, dataset_dir=
         log.info('dataset-run-end', dataset=dataset_id, dataset_no=no, **kvs)
         print(score)
 
+def autoparse_number(s):
+    if '.' in s:
+        return float(s)
+    else:
+        return int(s)
+
+def config_number_list(var : str, default : str, delim=',') -> list[int]:
+
+    s = os.environ.get(var, default)
+    tok = s.split(delim)
+    values = [ autoparse_number(v.strip()) for v in tok if v.strip() ] 
+
+    print(tok, values)
+
+    return values
 
 def main():
     
     repetitions = int(os.environ.get('REPETITIONS', '3'))
     folds = int(os.environ.get('FOLDS', '5'))
+    trees = config_number_list('TREES', '100')
+    min_samples_leaf = config_number_list('MIN_SAMPLES_LEAF', '1')
 
-    experiments = {
-       #'sklearn_defaults': dict(dtype=None),
+    experiments = {}
+    for t in trees:
+        for l in min_samples_leaf:
+            name = f'tree-minsamplesleaf-{t}-{l}'
+            experiments[name] = dict(n_estimators=t, min_samples_leaf=l)
 
-        #'trees5': dict(n_estimators=5),
-        #'trees10': dict(n_estimators=10),
-        #'trees20': dict(n_estimators=20),
-        #'trees40': dict(n_estimators=40),
-
-        #'minsamples10-1': dict(min_samples_leaf=0.1),
-        'minsamples10-2': dict(min_samples_leaf=0.01),
-        'minsamples10-3': dict(min_samples_leaf=0.001),
-        'minsamples_defaults': dict(min_samples_leaf=1),
-
-       #'rf10_float': dict(dtype=float, target_max=1000.0),   
-       #'rf10_32bit': dict(dtype=numpy.int32, target_max=2**31-1),   
-       #'rf10_16bit': dict(dtype=numpy.int16, target_max=2**15-1),
-        #'rf10_12bit': dict(dtype=numpy.int16, target_max=2**12-1),
-        #'rf10_10bit': dict(dtype=numpy.int16, target_max=2**10-1),
-       #'rf10_8bit': dict(dtype=numpy.int8, target_max=127),
-    }
+    print('Experiments:')
+    for k, v in experiments.items():
+        print(k, v)
 
     quantizers = [None, 0, 4, 8, 16]
     clusters = [ None, 1, 2, 4, 8, 16, 32 ]
