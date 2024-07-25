@@ -372,72 +372,22 @@ def run_datasets(pipeline, out_dir, run_id, quantizer=None, kvs={}, dataset_dir=
 
 
 def main():
-
-    # optimization steps. To be compared in experiments / ablated
-    # reduce number of features. To <255
-    # quantize features to int16
-    # reduce number of trees
-    # try replace nodes with k-means quantized versions
-
-    # TODO: run a hyperparameter search on each dataset.
-    # Find appropriate parameters, when no optimizations used
-    # for a particular set of trees. 10 is a good starting point?
-    # 1. Feature quantize 16 bit
-    # 2. Leaf quantize 8 bit
-    # 3. Leaf+feature quantize
-    #
-    # 4. Leaf reduce.
-    # TODO: specify  clusters as max leaves per class. 1,2,4,8,16,32,64,128
-
-    # Research questions
-    # A) how well does feature and leaf quantization work?
-    # Hypothesis: 16 bit feature is ~lossless. A 8 bit leaf probabilities is ~lossless
-    # Results indicate that 16 bit featurs is indeed lossless. Within the margins of error for experiment
-    # TODO: merge the int16 support to emlearn
-    #
-    # TODO: check 8 bit leaf probability quantization on CC-18
-
-    # TODO: set a few model size budgets. See how much performance one gets within that boundary
-    # uncontrained, 100kB, 10kB, 1kB
-
-    # B) how well does leaf clustering work?
-    # Hypothesis: Can reduce leaf size by 2-10 without ~zero loss in performance. Can reduce overall model size by 2-5x
-    # Preliminary results do indicate that up to 5x model size reduction is possible with low perf drops
-    # however there are a few outliers, where even 0.8 the original size causes drop in performance 
-
-
-    # C) how does code generation vs data structure compare, wrt size and inference time
-    # Hypothesis: datastructure "loadable" is smaller in size, but slower in inference time
-    # 
-
-    # D) what are limitating factors for practical models on microcontrollers
-    # Hypothesis: Model size is the primary bottleneck/constraint
-    # accelerometer. 10 FPS
-    # sound. 25 FPS
-    # images 1 FPS
-    # maybe do a "worst case" analysis of largesr ensembles that fit on a micro. 10kB, 100kB.
-    # Execution speed for max depths.
-    # Or do a synthetic N deep execution speed test? To get time-per-decision. On common micros
-    # Hypothesis: Feature extraction dominates tree execution
-    # maybe compare tree execution speed with a simple preprocessing. EX: RMS
-
-
-    # E) how does emlearn RF compare to other frameworks. m2cgen and micromlgen
-    # in terms of size and execution speed. At near 0 error rate 
     
-    
+    repetitions = int(os.environ.get('REPETITIONS', '3'))
+    folds = int(os.environ.get('FOLDS', '5'))
+
     experiments = {
-       'sklearn_defaults': dict(dtype=None),
+       #'sklearn_defaults': dict(dtype=None),
 
         #'trees5': dict(n_estimators=5),
         #'trees10': dict(n_estimators=10),
         #'trees20': dict(n_estimators=20),
         #'trees40': dict(n_estimators=40),
 
-        #'minsamples10-4': dict(min_samples_leaf=0.0001),
-        #'minsamples10-3': dict(min_samples_leaf=0.001),
+        'minsamples10-1': dict(min_samples_leaf=0.1),
         #'minsamples10-2': dict(min_samples_leaf=0.01),
-        #'minsamples10-1': dict(min_samples_leaf=0.1),
+        #'minsamples10-3': dict(min_samples_leaf=0.001),
+        #'minsamples_defaults': dict(min_samples_leaf=1),
 
        #'rf10_float': dict(dtype=float, target_max=1000.0),   
        #'rf10_32bit': dict(dtype=numpy.int32, target_max=2**31-1),   
@@ -469,7 +419,7 @@ def main():
 
         # classifier
         rf = RandomForestClassifier(
-            #n_estimators=config.get('n_estimators', 10), 
+            n_estimators=config.get('n_estimators', 10),
             min_samples_leaf=config.get('min_samples_leaf', 1),
             #max_features=0.33,
         )
@@ -477,7 +427,8 @@ def main():
 
         run_id = uuid.uuid4().hex.upper()[0:6] + f'_{experiment}'
 
-        run_datasets(p, quantizer=quantizer, optimizers=optimizers, kvs=dict(experiment=experiment), out_dir=out_dir, run_id=run_id, repetitions=3, cv=5)
+        run_datasets(p, quantizer=quantizer, optimizers=optimizers, kvs=dict(experiment=experiment),
+            out_dir=out_dir, run_id=run_id, repetitions=repetitions, cv=folds)
 
 
     print('Results written to', out_dir)
