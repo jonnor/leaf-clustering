@@ -212,49 +212,7 @@ def optimize(estimator, n_samples, n_classes, leaf_quantization=None, leaves_per
 
             for i in range(len(e.tree_.value)):
                 e.tree_.value[i] = v[i]
-
-
-
-class CustomRandomForestClassifier(BaseEstimator, ClassifierMixin):
-
-    def __init__(self, clusters=None, leaf_quantization=None, **kwargs):
-        #print('INIT', leaf_quantization)
-
-        self.estimator = RandomForestClassifier(**kwargs)
-        self.clusters = clusters
-        self.leaf_quantization = leaf_quantization 
-
-    def get_params(self, deep=True):
-        params = self.estimator.get_params()
-        params['clusters'] = self.clusters
-        params['leaf_quantization'] = self.leaf_quantization
-        return params
-
-    def set_params(self, **parameters):
-        #print("SET", **parameters)
-        our_keys = set(['clusters', 'leaf_quantization'])
-        our_params = { k: v for k, v in parameters if k in our_keys }
-        rf_params = { k: v for k, v in parameters if k not in our_keys }
-        ret = self.estimator.set_params(**rf_params)
-
-        for k, v in our_params:
-            setattr(self, k, v)
-
-        return ret 
-
-    def predict(self, X):
-        return self.estimator.predict(X)
-
-    def predict_proba(self, X):
-        return self.estimator.predict_proba(X)
-
-    def fit(self, X, y):
-        ret = self.estimator.fit(X, y)
-        self.classes_ = self.estimator.classes_
-
-        optimize(self, leaf_quantization=self.leaf_quantization, clusters=self.clusters)
-
-        return ret        
+    
 
 def setup_data_pipeline(data, quantizer=None):
 
@@ -390,7 +348,7 @@ def run_datasets(pipeline, out_dir, run_id, quantizer=None, kvs={}, dataset_dir=
         dataset_dir = 'data/raw/openml-cc18/datasets'
 
     matches = glob.glob('*.parquet', root_dir=dataset_dir)
-    assert len(matches) == 63, len(matches)
+    assert len(matches) == 52, len(matches)
     for no, f in enumerate(matches):
         dataset_id = os.path.splitext(f)[0]
         dataset_path = os.path.join(dataset_dir, f)
@@ -469,12 +427,18 @@ def main():
     
     
     experiments = {
-        #'rf10_noclust': dict(clusters=None, n_estimators=10),
-        #'rf10_100clust': dict(clusters=100, n_estimators=10),
-        #'rf10_30clust': dict(clusters=30, n_estimators=10),
-        #'rf10_10clust': dict(clusters=10, n_estimators=10),
+       'sklearn_defaults': dict(dtype=None),
 
-       'rf10_none': dict(dtype=None),
+        #'trees5': dict(n_estimators=5),
+        #'trees10': dict(n_estimators=10),
+        #'trees20': dict(n_estimators=20),
+        #'trees40': dict(n_estimators=40),
+
+        #'minsamples10-4': dict(min_samples_leaf=0.0001),
+        #'minsamples10-3': dict(min_samples_leaf=0.001),
+        #'minsamples10-2': dict(min_samples_leaf=0.01),
+        #'minsamples10-1': dict(min_samples_leaf=0.1),
+
        #'rf10_float': dict(dtype=float, target_max=1000.0),   
        #'rf10_32bit': dict(dtype=numpy.int32, target_max=2**31-1),   
        #'rf10_16bit': dict(dtype=numpy.int16, target_max=2**15-1),
@@ -487,7 +451,6 @@ def main():
     clusters = [ None, 1, 2, 4, 8, 16, 32 ]
 
     optimizers = [ {'quantize': q, 'cluster': c} for q in quantizers for c in clusters ]
-
 
     out_dir = 'output/results/experiments.parquet'
     if not os.path.exists(out_dir):
@@ -506,16 +469,15 @@ def main():
 
         # classifier
         rf = RandomForestClassifier(
-            n_estimators=config.get('n_estimators', 10), 
-            min_samples_leaf=0.01,
-            #clusters=config.get('clusters', None),
-            #leaf_quantization=config.get('leaf_quantization', None),
+            #n_estimators=config.get('n_estimators', 10), 
+            min_samples_leaf=config.get('min_samples_leaf', 1),
+            #max_features=0.33,
         )
         p.append(rf)
 
         run_id = uuid.uuid4().hex.upper()[0:6] + f'_{experiment}'
 
-        run_datasets(p, quantizer=quantizer, optimizers=optimizers, kvs=dict(experiment=experiment), out_dir=out_dir, run_id=run_id, repetitions=5, cv=5)
+        run_datasets(p, quantizer=quantizer, optimizers=optimizers, kvs=dict(experiment=experiment), out_dir=out_dir, run_id=run_id, repetitions=3, cv=5)
 
 
     print('Results written to', out_dir)
