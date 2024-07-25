@@ -1,5 +1,6 @@
 
 import os
+import sys
 
 import openml
 import pandas
@@ -46,7 +47,7 @@ def download_openml_cc18(out_dir):
         tasks.to_csv(tasks_path)
         log.info('task-list-downloaded', tasks=len(tasks), path=tasks_path)
 
-    for dataset_id in tasks['did']:
+    for dataset_id, dataset_name in zip(tasks['did'], tasks['name']):
         # TODO: add retrying with delay, sometimes there are connection problems
 
         # This is done based on the dataset ID.
@@ -56,16 +57,21 @@ def download_openml_cc18(out_dir):
             download_features_meta_data=False,
         )
 
-        print(dataset.description[:100])
-
         target = dataset.default_target_attribute
         X, y, categorical_indicator, attribute_names = dataset.get_data(target=target)
 
         data = X.copy()
         data['__target'] = y
 
-        data.to_parquet(os.path.join(datasets_dir, f'{dataset_id}.parquet'))
+        dataset_path = os.path.join(datasets_dir, f'{dataset_id}.parquet')
+        data.to_parquet(dataset_path)
+        log.info('dataset-downloaded', id=dataset_id, name=dataset_name)
 
 
 if __name__ == '__main__':
-    download_openml_cc18('data/raw/openml-cc18')
+    default_path = 'data/raw/openml-cc18'
+    path = default_path
+    if len(sys.argv) > 1:
+        path = sys.argv[1]
+
+    download_openml_cc18(path)
