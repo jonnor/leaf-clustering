@@ -384,10 +384,10 @@ def main():
         #'trees20': dict(n_estimators=20),
         #'trees40': dict(n_estimators=40),
 
-        'minsamples10-1': dict(min_samples_leaf=0.1),
-        #'minsamples10-2': dict(min_samples_leaf=0.01),
-        #'minsamples10-3': dict(min_samples_leaf=0.001),
-        #'minsamples_defaults': dict(min_samples_leaf=1),
+        #'minsamples10-1': dict(min_samples_leaf=0.1),
+        'minsamples10-2': dict(min_samples_leaf=0.01),
+        'minsamples10-3': dict(min_samples_leaf=0.001),
+        'minsamples_defaults': dict(min_samples_leaf=1),
 
        #'rf10_float': dict(dtype=float, target_max=1000.0),   
        #'rf10_32bit': dict(dtype=numpy.int32, target_max=2**31-1),   
