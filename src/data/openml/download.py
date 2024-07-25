@@ -34,12 +34,13 @@ def download_openml_cc18(out_dir):
         # Remove tasks/datasets with missing values
         tasks_missing_values = tasks['NumberOfInstancesWithMissingValues'] > 0
         print('Dropping tasks with missing values')
-        print(tasks[tasks_missing_values])
+        print(tasks[tasks_missing_values][['tid', 'did', 'name']])
         tasks = tasks[~tasks_missing_values]
 
         tasks.to_csv(tasks_path)
 
     for dataset_id in tasks['did']:
+        # TODO: add retrying with delay, sometimes there are connection problems
 
         # This is done based on the dataset ID.
         dataset = openml.datasets.get_dataset(dataset_id,
