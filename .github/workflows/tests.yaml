@@ -41,8 +41,8 @@ jobs:
       python-version: '3.10'
     strategy:
       matrix:
-        TREES: [5, 10, 20, 40]
-        MIN_SAMPLES_LEAF: ['1,0.1,0.001,0.001']
+        trees: [5, 10, 20, 40]
+        min_samples_leaf: ['1,0.1,0.001,0.001']
 
     steps:
       - uses: actions/checkout@v4
@@ -75,7 +75,7 @@ jobs:
 
       - name: Run experiments
         run: |
-          python -m src.experiments.run
+          TREES=${{ matrix.trees }} MIN_SAMPLES_LEAF=${{ matrix.min_samples_leaf }} python -m src.experiments.run
 
       - uses: actions/upload-artifact@v4
         with:
