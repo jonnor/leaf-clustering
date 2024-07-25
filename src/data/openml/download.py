@@ -50,6 +50,11 @@ def download_openml_cc18(out_dir):
     for dataset_id, dataset_name in zip(tasks['did'], tasks['name']):
         # TODO: add retrying with delay, sometimes there are connection problems
 
+        dataset_path = os.path.join(datasets_dir, f'{dataset_id}.parquet')
+        if os.path.exists(dataset_path):
+            log.info('dataset-exists', id=dataset_id, name=dataset_name)
+            continue
+
         # This is done based on the dataset ID.
         dataset = openml.datasets.get_dataset(dataset_id,
             download_data=False,
@@ -63,7 +68,6 @@ def download_openml_cc18(out_dir):
         data = X.copy()
         data['__target'] = y
 
-        dataset_path = os.path.join(datasets_dir, f'{dataset_id}.parquet')
         data.to_parquet(dataset_path)
         log.info('dataset-downloaded', id=dataset_id, name=dataset_name)
 
