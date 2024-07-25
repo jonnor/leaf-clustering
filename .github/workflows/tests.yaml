@@ -59,6 +59,13 @@ jobs:
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           if [ -f requirements.dev.txt ]; then pip install -r requirements.dev.txt; fi
 
+      - name: Cache dataset
+        id: cache-openml-cc18
+        uses: actions/cache@v4
+        with:
+          path: data/raw/openml-cc18
+          key: openml-cc18-1
+
       - name: Download data
         run: |
           python -m src.data.openml.download
@@ -66,3 +73,8 @@ jobs:
       - name: Run experiments
         run: |
           python -m src.experiments.run
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openml-cc18-results
+          path: output/results/
