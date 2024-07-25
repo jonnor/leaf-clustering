@@ -4,6 +4,10 @@ import os
 import openml
 import pandas
 import openml.datasets
+import structlog
+
+
+log = structlog.get_logger()
 
 
 def download_openml_cc18(out_dir):
@@ -33,11 +37,14 @@ def download_openml_cc18(out_dir):
 
         # Remove tasks/datasets with missing values
         tasks_missing_values = tasks['NumberOfInstancesWithMissingValues'] > 0
-        print('Dropping tasks with missing values')
-        print(tasks[tasks_missing_values][['tid', 'did', 'name']])
-        tasks = tasks[~tasks_missing_values]
+        tasks_too_many_features = tasks['NumberOfFeatures'] >= 255
+        drop_tasks = tasks_missing_values | tasks_too_many_features
+        print('Dropping tasks not fitting criteria')
+        print(tasks[drop_tasks][['tid', 'did', 'name']])
+        tasks = tasks[~drop_tasks]
 
         tasks.to_csv(tasks_path)
+        log.info('task-list-downloaded', tasks=len(tasks), path=tasks_path)
 
     for dataset_id in tasks['did']:
         # TODO: add retrying with delay, sometimes there are connection problems
