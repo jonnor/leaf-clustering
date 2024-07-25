@@ -1,5 +1,6 @@
 
 ## Optimizing Random Forest-Based Inference on RISC-V MCUs at the Extreme Edge
+https://dl.acm.org/doi/10.1109/TCAD.2022.3199903
 
 Defines multiple inference strategies for decision trees / forests.
 Uses floating point features, 32 bits / 1 word.
@@ -18,3 +19,16 @@ Tested on two datasets, Vehicle and MFeat (handwritten digits).
 
 4.8× speedup, and 45% storage reduction over naive.
 Found DT-Rec and DT-Arr to be pareto optimal over DT-Loop and Naive.
+
+
+# Hyperparameter tuning
+
+## Hyperparameters and Tuning Strategies for Random Forest
+
+Looks at 500++ trees.
+References many other relevant works.
+
+
+## Better Trees: An empirical study on hyperparameter tuning of classification decision tree induction algorithms
+
+Does not consider ensembles. Only CART and J48.
