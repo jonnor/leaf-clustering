@@ -79,5 +79,5 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: openml-cc18-results
+          name: openml-cc18-results-trees-${{ matrix.trees }}-min_samples_leaf-${{ matrix.min_samples_leaf }}
           path: output/results/
