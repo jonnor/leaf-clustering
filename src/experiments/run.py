@@ -392,11 +392,12 @@ def main():
     folds = int(os.environ.get('FOLDS', '5'))
     trees = config_number_list('TREES', '100')
     min_samples_leaf = config_number_list('MIN_SAMPLES_LEAF', '1')
+    experiment = os.environ.get('EXPERIMENT', 'tree-minsamplesleaf')
 
     experiments = {}
     for t in trees:
         for l in min_samples_leaf:
-            name = f'tree-minsamplesleaf-{t}-{l}'
+            name = f'{experiment}-{t}-{l}'
             experiments[name] = dict(n_estimators=t, min_samples_leaf=l)
 
     print('Experiments:')
