@@ -2,46 +2,31 @@
 ## Open questions
 
 
-Do we need to tune hyper-parameters to demonstrate our case?
-hard vs soft-voting may expected to depend on number of trees:
-fewer trees, bigger difference.
-
-Difference is expected to depend on the depth limiters.
-Without any limitation -> no difference.
-
-Our model system has limits.
-n_features <= 255
-model size total. << 1MB, preferably 10-100 kB
-
-
-BASELINE. scikit-learn defaults. 100 trees, no limit.
-10 trees. min_sample_leaf values
-
-    # 5, 10, 20, 40 n_trees
-    # 1e-5, .. 0.001 min_samples_leaf. And default ??
-    # float, int16
-
-Running time
-Total took 1 hour on Github for 10 trees, 0.01 min_samples_leaf
-Default scikit learn the slowest.
-
-Compute performance drop wrt BASELINE.
-Plot perf drop Y, vs min_samples_leaf / n_estimators as HUE and X.
-Keep variation between datasets.
-Not guarateed to be understandable, might get messy
-Can also try boxplots.
-
 #### What range of models are feasible at all
+
+model size total. `<< 1MB`, preferably 10-100 kB
 
 Plot model size estimates for datasets.
 With majority voting, best case scenario.
 
+median around 10kB.
+Majority under 100kB. OK.
 
 #### What differences are there between soft and hard voting
+
+Thesis:
+1. As the number of trees get smaller (to reduce model size), the importance of limiting depth goes up (to preserve performance / reduce overfitting)
+2. As the number of trees, and depth is restricted - performance drop due to majority vote goes up
+=> potential for restoring performance by clustered leaves
+
+
+BASELINE. scikit-learn defaults. 100 trees, no limit.
 
 Consider only a simple approach of breadth+depth.
 Using n_estimators and min_samples_leaf
 Keeping max_features to default.
+
+5-40 trees. min_samples_leaf. 1-128, power of 2
 
 ### Hyperparameter selection strategy.
 
@@ -65,7 +50,7 @@ Can be improved by doing a post-training quantization?
 Would need to scale the values to be int16 compatible before training.
 Then apply feature quantization for test set only.
 
-#### How wel does leaf quantization work
+#### How well does leaf quantization work
 
 Hypothesis: A 8 bit leaf probabilities is ~lossless
 
@@ -122,6 +107,9 @@ Also measure the RMSE/MAE after clustering?
 Plot error metrics vs performance reduction, for the various n leaf clusters
 
 ## Dataset selection
+
+Our model system has limited number of features.
+n_features <= 255
 
 ? how many features are in the OpenML datasets
 
