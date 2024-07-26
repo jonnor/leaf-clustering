@@ -301,6 +301,11 @@ def cross_validate(pipeline, X, Y,
             for metric, scorer in scoring.items():
                 res[f'test_{metric}'] = scorer(opt, X_test, Y_test)
 
+            for metric in ['roc_auc']:
+                scored = scoring[metric]
+                res[f'train_{metric}'] = scorer(opt, X_train, Y_train)
+
+
             dfs.append(res)
 
         return dfs 
