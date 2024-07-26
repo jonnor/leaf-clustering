@@ -208,7 +208,7 @@ def enrich_results(df):
     leaf_bytes_per_class = leaf_bytes_per_class.fillna(value=4).astype(int)
 
     # FIXME: take the feature precision into account
-    decision_node_bytes = 2
+    decision_node_bytes = 8
 
     df = df.rename(columns={'test_leasize': 'test_leafsize'}) # Fixup typo
 

@@ -433,7 +433,13 @@ def main():
 
         run_id = uuid.uuid4().hex.upper()[0:6] + f'_{experiment}'
 
-        run_datasets(p, quantizer=quantizer, optimizers=optimizers, kvs=dict(experiment=experiment),
+        kvs = {}
+        kvs.update(config)
+        kvs['experiment'] = experiment
+        kvs['folds'] = folds
+        kvs['repetitions'] = repetitions
+
+        run_datasets(p, quantizer=quantizer, optimizers=optimizers, kvs=kvs,
             out_dir=out_dir, run_id=run_id, repetitions=repetitions, cv=folds)
 
 
