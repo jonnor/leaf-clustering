@@ -42,8 +42,8 @@ jobs:
       experiment: trees_minsamplesleaf_2
     strategy:
       matrix:
-        trees: [5, 10, 20, 40]
-        min_samples_leaf: ['1,2,4,8,16,32,64,128']
+        trees: [40]
+        min_samples_leaf: [ 1,2,4,8,16,32,64,128 ]
 
     steps:
       - uses: actions/checkout@v4
