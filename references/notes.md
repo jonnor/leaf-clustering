@@ -53,8 +53,19 @@ Then apply feature quantization for test set only.
 #### How well does leaf quantization work
 
 Hypothesis: A 8 bit leaf probabilities is ~lossless
-
 Seems to be the case.
+
+Not needed to analyze separately from clustering?
+
+#### What is the potential savings from leaf clustering
+
+Shown for n_samples_leaf.
+Assuming the same behavior from other restrictions on depth, such as max_depth.
+TODO: run an experiment also with max depth, to confirm this
+
+20,18,16,14,12,10,8,6,4,2
+20,16,12,8,4
+
 
 #### How well does leaf clustering work?
 
