@@ -399,12 +399,14 @@ def main():
     min_samples_leaf = config_number_list('MIN_SAMPLES_LEAF', '1')
     experiment = os.environ.get('EXPERIMENT', 'tree-minsamplesleaf')
     feature_dtype = os.environ.get('FEATURE_DTYPE', None)
+    max_depth = config_number_list('MAX_DEPTH', '')
 
     experiments = {}
     for t in trees:
-        for l in min_samples_leaf:
-            name = f'{experiment}-{t}-{l}'
-            config = dict(n_estimators=t, min_samples_leaf=l, dtype=feature_dtype)
+
+        for d in max_depth:
+            name = f'{experiment}-{t}-{d}'
+            config = dict(n_estimators=t, max_depth=d, dtype=feature_dtype)
             if feature_dtype == 'int16':
                 config['target_max'] = (2**15)-1
             experiments[name] = config
@@ -437,7 +439,7 @@ def main():
         rf = RandomForestClassifier(
             n_estimators=config.get('n_estimators', 10),
             min_samples_leaf=config.get('min_samples_leaf', 1),
-            #max_features=0.33,
+            max_depth=config.get('max_depth', None),
         )
         p.append(rf)
 
