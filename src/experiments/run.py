@@ -398,12 +398,16 @@ def main():
     trees = config_number_list('TREES', '100')
     min_samples_leaf = config_number_list('MIN_SAMPLES_LEAF', '1')
     experiment = os.environ.get('EXPERIMENT', 'tree-minsamplesleaf')
+    feature_dtype = os.environ.get('FEATURE_DTYPE', None)
 
     experiments = {}
     for t in trees:
         for l in min_samples_leaf:
             name = f'{experiment}-{t}-{l}'
-            experiments[name] = dict(n_estimators=t, min_samples_leaf=l)
+            config = dict(n_estimators=t, min_samples_leaf=l, dtype=feature_dtype)
+            if feature_dtype == 'int16':
+                config['target_max'] = (2**15)-1
+            experiments[name] = config
 
     print('Experiments:')
     for k, v in experiments.items():
