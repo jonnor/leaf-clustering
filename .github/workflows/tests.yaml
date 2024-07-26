@@ -39,10 +39,11 @@ jobs:
     runs-on: ubuntu-latest
     env:
       python-version: '3.10'
+      experiment: trees_minsamplesleaf_2
     strategy:
       matrix:
         trees: [5, 10, 20, 40]
-        min_samples_leaf: ['1,0.1,0.001,0.001']
+        min_samples_leaf: ['1,2,4,8,16,32,64,128']
 
     steps:
       - uses: actions/checkout@v4
@@ -75,7 +76,7 @@ jobs:
 
       - name: Run experiments
         run: |
-          TREES=${{ matrix.trees }} MIN_SAMPLES_LEAF=${{ matrix.min_samples_leaf }} python -m src.experiments.run
+          EXPERIMENT=${{ env.experiment }} REPETITIONS=1 TREES=${{ matrix.trees }} MIN_SAMPLES_LEAF=${{ matrix.min_samples_leaf }} python -m src.experiments.run
 
       - uses: actions/upload-artifact@v4
         with:
