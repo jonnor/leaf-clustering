@@ -22,7 +22,7 @@
 \begin{document}
 
 %% Title
-\title{(preliminary title) Leaf compression for tiny Random Forests}
+\title{(preliminary title) Model compression for Random Forests using leaf clustering}
 
 %% Author info
 \author{
@@ -39,6 +39,15 @@
 
 %% Abstract
 \begin{abstract}	\noindent
+The Random Forest algorithm has been very successful, and continue to be a powerful choice on low-power microcontrollers with small amounts of memory and compute.
+Current size-optimized implementations of Random Forest tend to use hard majority voting, where each decision tree returns the most probable class, instead of the class proportions (probabilities).
+We show that the hard majority voting rule can lead to a considerable drop in predictive performance on some datasets.
+To find a better tradeoff between predictive performance and model size, we propose to use quantization and K-means clustering to adaptively select a small set of class proportions to store for the decision trees.
+We evaluate the proposed method on 60 classification datasets from the OpenML CC18 benchmark suite.
+Find that only a few class probabilities need to be stored to retain good performance,
+with small increase in model size over hard majority voting.
+When combined with 16-bit integer quantization of the input features, the method reached average model compression of XX, when staying within XXX percentage point performance drop.
+The method is implemented in the open-source TinyML library emlearn, and demonstrated running on microcontrollers for Human Activity recognition tasks.
 
 % Keywords. Maximum 5
 \noindent \textbf{Keywords}: Random Forest, TinyML, model compression, tree-based ensemble
@@ -49,28 +58,72 @@
 \section{Introduction}
 
 Big picture motivation.
+TinyML use-cases.
+TinyML setting. On device inference. Low power. Wireless sensing.
 
 \noindent
 
 \newpage
 \section{Background}
 
-TinyML setting. On device inference. Low power. Wireless sensing.
+\cite{random_forest_breiman2001}
+
 Success cases for Random Forest in TinyML.
 Human Activity Recognition. \cite{elsts_are_2021}
 Animal behavior. \cite{tatler_high_2018} \cite{kleanthous_feature_2020} \cite{tran_iot-based_2022}
-Battery monitoring. \cite{mawonou_state--health_2021}
 
+% REGRESSION, not classification Battery monitoring. \cite{mawonou_state--health_2021}
+
+TODO: illustration of tree structure
+TODO: illustration of the storage, of decision nodes and leaves
 Structure of a random forest.
 Decision nodes, leaf nodes.
 Voting rules. argmax / Hard majority.
 Probability average. Soft.
 
 Fully grown versus partially grown trees.
+Fully grown, all leaves with end up with class proportions.
+However when there are restrictions. Such as $max_depth$, $min_samples_leaf$, $min_samples_split$ etc.
+In resource constrained environments, this is the more realistic case.
+
+
+Class probabilities. 32 bit floating point.
+$leaf_size: n_leaves * n_classes * 4 bytes$
+
+Ensemble voting rule:
+\begin{verbatim}
+probabilities[n_trees, n_classes]
+for tree in forest:
+   tree_probabilities = predict_tree(tree)
+   probabilities[tree] = tree_probabilities
+proba = mean(probabilities, axis=1)
+\end{verbatim}
+
+As implemented in scikit-learn \cite{scikit-learn} RandomForestClassifier.
+
+Hard majority. argmax. With leaf-deduplication.
+Using 1 byte for the class indices, allows up to 255 classes.
+
+$leaf_size = n_classes * 1 * 1 byte$
+
+Voting rule:
+\begin{verbatim}
+votes[n_classes] = {0,...}
+for tree in forest:
+   class_index = predict_tree(tree)
+   votes[class_index] += 1
+out = argmax(votes)
+proba = votes / n_classes
+\end{verbatim}
+
+As implemented in emlearn 0.9.0 (2019) \cite{emlearn}.
+
+Proposed. Use soft voting rule. Reduce $n_leaves$ using clustering and reduce bitdepth using quantization.
 
 \subsection{Related work}
 
-Optimization techiques for decision trees and decision tree ensembles like Random Forest.
+Optimization techniques for decision trees and decision tree ensembles such as Random Forest has been studied extensively over the last decades, including in a low-power, low-compute setting.
+
 Integer quantization of features.
 FPGA/hardware related.
 SIMD tree evaluation.
@@ -85,46 +138,74 @@ Software tools for deploying RF to TinyML. Open-source
 
 
 \section{Methods}
-
 What we cover: Feature quantization. Leaf quantization. Leaf clustering.
 
-
-
-OpenML CC18 datasets.
-Selected / eliminated datasets.
+OpenML CC18 datasets. \cite{oml-benchmarking-suites}
+To avoid needing data imputation, the datasets with missing values were ignored.
 TODO: list exact identifiers for that which was eliminated
 
-Train a general model. Using scikit-learn.
+Train a general model. Using scikit-learn. \cite{scikit-learn}
+Using 10 trees ({n_estimators}). And {min_samples_leaf=0.01}.
+NOTE: clustering will probably save more in percent, the more leaves are used.
+Increases both with the number of trees, and the effective depth
+- but total model sizes in excess of 100 kB is less relevant for the typical usecase
+
+TODO: consider other values for {min_samples_leaf} ?
+Either multiple, or tune on datasets.
+It will affect leaf growth.
+
+Metric. AUC ROC one-versus-all.
+
+Numerical variables are scaled using RobustScaler.
+Categorical variables are encoded using OrdinalEncoder.
 
 Apply compression strategy to trained model. Re-running predictions on test set.
 
-Cross validation.
+Cross validation using stratified k-fold.
 
-? Demonstrator of performance on one or few TinyML datasets.
-PAMAP.
-Comparisons with other frameworks. 
+? Demonstrator of performance on one or few TinyML tasks/datasets.
+HAR: PAMAP. UCI DSADS. OPPORTUNITY ? F1 scores. 
+Comparisons with other frameworks. Leaf cluster (emlearn), m2cgen, micromlgen
+Hardware architectures. ARM Cortex M0+ (no FPU). ESP32 (FPU). Alt: Cortex M4F
+TODO: visualization. Panel over HW,dataset of scatterplots with model size and inference time
+Need to implement feature computation also.
 
 \footnote{The code for reproducing the experiments can be found at https://github.com/jonnor/leaf-quantization}
 
 \newpage
 \section{Results}
 
-Performance with 16bit and 8 bit feature quantization, vs floating point.
+0. Baseline for comparison.
+1. Performance with 16bit and 8 bit feature quantization, vs floating point.
+Without any changes to the leaves.
+Practically no degradation in performance.
 
-
-Percentage of model space (bytes) used for leaves.
+INTERMEDIATE. Percentage of model space (bytes) used for leaves.
 Histogram over models from all the datasets. Using 16 bit 
 For float (no quantization), uint16 and uint8 quantization (with deduplication).
-Determines the saving potential we have.
+Determines the saving *potential* we have.
 
-? claim. Model size is the typical main contraint for RF in TinyML settings. Execution time is less of a problem
+
+
+REAL WORLD TEST.
+? Would have to make some illustrations of this.
+For example on HAR task/datasets, that on relevant microcontrollers, memory is problem before execution time. Need also to account for feature extraction time, which dominates.
+Typical workflow. Set hard constraints on model size. Optimize for maximal predictive performance. Say 1kB, 10kB, 100kB - or maybe steps of 2x
+VISUALIZATION. Model size vs predictive performance. And inference time vs predictive performance. Multiple model sizes. One line per framework, linked 
+
+
 
 %% DISCUSSION
 \section{Discussion}
 
+? claim. Model size is the typical main constraint for RF in TinyML settings.
+Execution time (and power consumption) is less of a problem.
+
 \subsection{Further work}
 
-Leaf clustering for regression.
+Here we only considered the use of Random Forest for classification.
+The models are also used for regression.
+Explore whether leaf clustering could also be useful for regression.
 
 
 %\newpage
