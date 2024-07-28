@@ -53,10 +53,14 @@ to minimize the memory footprint.
 > In terms of cycles, RFs clearly outperform BNNs for accuracy values < 60%, requiring around 2.5k cycles even for large models.
 > However, we could not find a RF-based solution able to produce higher accuracy, without exceeding the entire 520kB of memory of the target HW.
 
-? Should be possible to reach much higher than 60% with RF on UniMiB-SHAR ?
+? Should be possible to reach much higher than 59% with RF on UniMiB-SHAR ?
+BNN reached 70% accuracy.
+Some of the limitation is due to model size. Which our work would improve on.
+How much?
+But may also need more powerful feature engineering.
 
 "Adaptive Random Forests for Energy-Efficient Inference on Microcontrollers" (by same authors)
-also tests on UniMiB. Also struggled to get above 60%.
+also tests on UniMiB. Also struggled to RF above 60%.
 
 "High-Level Features for Human Activity Recognition and Modeling" reached up to 67.3% accuracy on UniMiB SHAR.
 

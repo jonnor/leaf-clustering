@@ -201,14 +201,16 @@ def plot_size_improvement(df, path):
 
 
 
-def enrich_results(df):
+def enrich_results(df,
+        leaf_node_bytes_default=4,
+        decision_node_bytes_default = 8):
 
     # compute storage size
     leaf_bytes_per_class = df['leaf_bits'] / 8
-    leaf_bytes_per_class = leaf_bytes_per_class.fillna(value=4).astype(int)
+    leaf_bytes_per_class = leaf_bytes_per_class.fillna(value=leaf_node_bytes_default).astype(int)
 
     # FIXME: take the feature precision into account
-    decision_node_bytes = 8
+    decision_node_bytes = decision_node_bytes_default
 
     df = df.rename(columns={'test_leasize': 'test_leafsize'}) # Fixup typo
 

@@ -1,4 +1,14 @@
 
+## TODO
+
+- Analysis. Include just-quantization in comparison. 8 bits
+- Experiments. Run for all depth optimization strategies. Verify showing same tendencies.
+- Setup full evaluation pipeline for HAR
+- Setup model export and microcontroller firmware
+- Investigate hyperparameter for controlling leaf clustering
+
+Rename the experiments. hard, soft-f32, soft-u8, cluster-u8, soft-u4, cluster-u4 ?
+
 ## Open questions
 
 
@@ -56,6 +66,9 @@ Hypothesis: A 8 bit leaf probabilities is ~lossless
 Seems to be the case.
 
 Not needed to analyze separately from clustering?
+Seems that most of the gains in model size comes from the 32bit->8bit storage for leaf values.
+TODO: should also run analysis with plain 8-bit quantization.
+Maybe also 4-bit quantization with or without clustering?
 
 #### What is the potential savings from leaf clustering
 
@@ -77,14 +90,21 @@ However there are a few outliers, where even 0.8 the original size causes drop i
 Pleliminary results indicate that under 8 leaves per class is enough to get within 1% drop on all datasets.
 
 
-#### What practical gains can one reach when combining all the methods
+#### What practical gains can one reach when combining the techniques
 
-Compare emlearn (with leaf clustering) with
-m2cgen and micromlgen
-In terms of size and inference time.
+Compare in terms of size and inference time.
+
+- emlearn (int16, 8bit leaf cluster)
+- emlearn 0.1x (float, majority)
+- m2cgen (float, ? )
+- micromlgen (float, ? )
+
+On HAR datasets.
 
 
 ## Out-of-scope
+
+To keep the paper focused. Candidates for "future work".
 
 #### How does code generation vs data structure compare, wrt size and inference time
 
@@ -107,6 +127,70 @@ Or do a synthetic N deep execution speed test? To get time-per-decision. On comm
 Hypothesis 2: Feature extraction dominates tree execution
 maybe compare tree execution speed with a simple preprocessing. EX: RMS
 
+#### Sub-byte leaf quantization
+
+Possibly 4 bits is enough in many cases?
+Half the size or leaves. 16 levels instead of 256.
+Might shift optimal to a few more leaves.
+As long as not 2x, still an overall gain.
+
+#### Decision node with implicit left node
+
+Could probably go down to 4 bytes per node?
+
+- uint8 feature, 255==leaf.
+- uint8 right node
+- int16 threshold.
+
+Limits right side jumps to 256 steps.
+More than that, and need to inject a dummy "jump" node?
+Is this case actually needed in practice? Under what conditions.
+
+And will get one extra node per leaf.
+Worst case of 50% leaf nodes. Still a win, when node is 4 bytes intead of 2.
+Expected model size to be 50% to 75% of 8 bytes per node.
+
+Actually 31 bits of space for in-line leaf value.
+Up to 7 classes with 4 bits quantization.
+Or 4 classes with 7 bits quantization.
+A bit limited when more classes are needed?
+
+Could  be a more custom byte-stream,
+where a leaf node can take 1 or more node slots, in case needed to support more leafbits*classes.
+First few bits would need to encode how many slots are needed.
+Maybe keep it 32 bit aligned for simplicity.
+Basically just an "inline" representation for leaf nodes,
+instead an index/pointer to external array.
+
+#### Struct of arrays
+
+Alternative is to move to an struct-of-array instead of array-of-structs.
+Avoids the (32-bit) padding issue.
+Easy to support either 8 or 16 bit thresholds.
+
+- feature. uint8, 255==leaf. Use both left+right to encode leaf pointer.
+- right childs. uint8 
+- left childs. uint8 
+- thresholds. int16 or int8
+
+5 bytes per decision node for int16. Or 4 bytes for int8.
+Expected model size being 60% the size of now? 1.8x the efficiency. Not reducing the leaves.
+Same structure with external leaf array.
+Flexible wrt number of classes. Or regression.
+Still making use of leaf clustering.
+
+Questions. Less cache friendly than now?
+If inference time goes down, maybe still worth it for the savings in model size?
+
+There is essentially 1-1.2 leaf nodes per decision node.
+So for decision+leaf, it is hard to do better than 48 bits - 6 bytes, if having 16 bit features and reach for leaves.
+Leaf pointer can be 16 bits.
+16 bits for threshold
+8 bits for feature
+8 bits for child
+Using 8 bits for threshold and leaf allow 32 bits. But will not work for all sized forests.
+
+So for 16 bit features and 15 bits leaf reach, 8 bytes (incl padding) per decision node, with leaf indices included, is pretty good.
 
 ## Expertiments
 
