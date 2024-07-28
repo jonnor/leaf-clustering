@@ -180,10 +180,41 @@ Need to implement feature computation also.
 Without any changes to the leaves.
 Practically no degradation in performance.
 
+\begin{figure}[h!]
+\begin{center}
+  \includegraphics[width=0.98\linewidth]{reports/figures/hyperparam-perfdrop-trees-strategies.png}
+  \end{center}
+  \caption{ Performance of relative to the strong baseline model, averaged over all datasets. With no restriction on tree growth ($min_samples_leaf=1$, leftmost side), majority voting and soft voting is identical. Majority voting performs worse compared to soft voting when tree growth is restricted, and this gets worse with lower number of trees. Soft voting benefits from tree growth restrictions, especially with lower number of trees. }
+  \label{fig:hyperparameter_strategies}
+\end{figure}
+
+
+Figure \ref{fig:leaf_proportions}). 
+
 INTERMEDIATE. Percentage of model space (bytes) used for leaves.
 Histogram over models from all the datasets. Using 16 bit 
 For float (no quantization), uint16 and uint8 quantization (with deduplication).
 Determines the saving *potential* we have.
+
+\begin{figure}[h!]
+\begin{center}
+  \includegraphics[width=2in]{reports/figures/leaf-uniqueness.png}
+  \end{center}
+  \caption{ More unique leaf values are produced when there are restrictions on tree growth. }
+  \label{fig:leaf_uniqueness}
+\end{figure}
+
+\begin{figure}[h!]
+\begin{center}
+  \includegraphics[width=2in]{reports/figures/leaf-proportion.png}
+  \end{center}
+  \caption{The proportion of model size used by leaf nodes make up changes as restriction on tree growth. TODO: write more }
+  \label{fig:leaf_proportions}
+\end{figure}
+
+
+
+
 
 
 
