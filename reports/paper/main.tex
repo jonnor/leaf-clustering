@@ -21,6 +21,11 @@
 % Document
 \begin{document}
 
+%% Custom commands
+% Inline reference to a hyperparameter.
+% Often contains underscores, which must be detokinized
+\newcommand{\hyperparam}[1]{\texttt{\detokenize{#1}}}
+
 %% Title
 \title{(preliminary title) Model compression for Random Forests using leaf clustering}
 
@@ -83,7 +88,7 @@ Probability average. Soft.
 
 Fully grown versus partially grown trees.
 Fully grown, all leaves with end up with class proportions.
-However when there are restrictions. Such as $max_depth$, $min_samples_leaf$, $min_samples_split$ etc.
+However when there are restrictions. Such as \hyperparam{max_depth}, \hyperparam{min_samples_leaf}, \hyperparam{min_samples_split} etc.
 In resource constrained environments, this is the more realistic case.
 
 
@@ -176,53 +181,80 @@ Need to implement feature computation also.
 \section{Results}
 
 0. Baseline for comparison.
+TODO: show a plot of the baseline performance?
+
 1. Performance with 16bit and 8 bit feature quantization, vs floating point.
 Without any changes to the leaves.
 Practically no degradation in performance.
+TODO: add some supporting references to 16 bits being enough. Both in general, and specific to decision trees / random forest
+
+\begin{figure}[h!]
+\begin{center}
+  \includegraphics[width=0.98\linewidth]{reports/figures/int16-vs-float.png}
+  \end{center}
+  \caption{ Performance of different feature representations, relative to the strong baseline model. Computed across all datasets and hyperparameters. 16-bit integer quantized features shows practically identical performance to full precision floating point. }
+  \label{fig:int16_vs_float}
+\end{figure}
 
 \begin{figure}[h!]
 \begin{center}
   \includegraphics[width=0.98\linewidth]{reports/figures/hyperparam-perfdrop-trees-strategies.png}
   \end{center}
-  \caption{ Performance of relative to the strong baseline model, averaged over all datasets. With no restriction on tree growth ($min_samples_leaf=1$, leftmost side), majority voting and soft voting is identical. Majority voting performs worse compared to soft voting when tree growth is restricted, and this gets worse with lower number of trees. Soft voting benefits from tree growth restrictions, especially with lower number of trees. }
+  \caption{ Performance relative to the strong baseline model, averaged over all datasets. With no restriction on tree growth (\hyperparam{min_samples_leaf=1}, leftmost side), majority voting and soft voting is identical. When tree growth is restricted, majority voting performs worse compared to soft voting, and this gets worse with lower number of trees. Soft voting benefits from tree growth restrictions, especially with lower number of trees. }
   \label{fig:hyperparameter_strategies}
 \end{figure}
 
 
-Figure \ref{fig:leaf_proportions}). 
+As the trees are more restricted, the uniqueness of leaf nodes goes up. 
+See Figure \ref{fig:leaf_uniqueness}).
+This happens because the algorithm is force to stop splitting a node before reaching a perfectly pure node (consisting of samples from a single class), and instead is left with a leaf consisting of a data-dependent proportion.
+This happens independently of the exact hyperparameter used to limit tree growth.
+% CLAIM. Not yet verified for all possibilities. Just min_samples_leaf and max_depth
 
-INTERMEDIATE. Percentage of model space (bytes) used for leaves.
-Histogram over models from all the datasets. Using 16 bit 
-For float (no quantization), uint16 and uint8 quantization (with deduplication).
-Determines the saving *potential* we have.
+% TODO: run experiments for all hyperparameters restricting tree depth
+% But probably no need to include all figures in the paper
+% scikit-learn RandomForest hyperparameters affecting tree depth and leaf nodes (number/split/composition)
+% direct restrictors on leaves
+% min_weight_fraction_leaf, min_samples_leaf, max_leaf_nodes
+% indirect restrictions
+% max_depth, min_samples_split, min_impurity_decrease, ccp_alpha
 
-\begin{figure}[h!]
-\begin{center}
+Since unique leaves cannot be deduplicated and must be stored individually, this leads to a larger proportion of the total model size taken up by leaves.
+This can be seen in Figure \ref{fig:leaf_proportions}).
+This leads to a potential for saving space by optimizing how leaves are stored. 
+
+TODO: also show \hyperparam{max_depth}  
+
+FIXME: check which leaf size is used. Should be 32-bit floating point for.
+And int16 features?
+
+\begin{figure}
+\centering
+\begin{minipage}{.5\textwidth}
   \includegraphics[width=2in]{reports/figures/leaf-uniqueness.png}
-  \end{center}
   \caption{ More unique leaf values are produced when there are restrictions on tree growth. }
   \label{fig:leaf_uniqueness}
-\end{figure}
-
-\begin{figure}[h!]
-\begin{center}
+\end{minipage}%
+\begin{minipage}{.5\textwidth}
+  \centering
   \includegraphics[width=2in]{reports/figures/leaf-proportion.png}
-  \end{center}
   \caption{The proportion of model size used by leaf nodes make up changes as restriction on tree growth. TODO: write more }
   \label{fig:leaf_proportions}
+\end{minipage}
 \end{figure}
 
+TODO: results with leaf clustering (and quantization) enabled
+Thesis: is pareto optimal in terms of predictive performance vs model size, when compared to majority and full soft voting
+? how to show that this holds across all (or majority) of datasets
 
-
-
-
-
+\subsection{Tests on microcontroller hardware}
 
 REAL WORLD TEST.
 ? Would have to make some illustrations of this.
 For example on HAR task/datasets, that on relevant microcontrollers, memory is problem before execution time. Need also to account for feature extraction time, which dominates.
 Typical workflow. Set hard constraints on model size. Optimize for maximal predictive performance. Say 1kB, 10kB, 100kB - or maybe steps of 2x
-VISUALIZATION. Model size vs predictive performance. And inference time vs predictive performance. Multiple model sizes. One line per framework, linked 
+
+VISUALIZATION. Model size vs predictive performance. And inference time vs predictive performance. Multiple model sizes. One line per framework, linked datapoints. Demonstrate Pareto optimality
 
 
 
