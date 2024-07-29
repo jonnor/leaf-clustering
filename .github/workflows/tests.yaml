@@ -75,7 +75,7 @@ jobs:
 
       - name: Run experiments
         run: |
-          EXPERIMENT=min_impurity_decrease REPETITIONS=1 TREES=${{ matrix.trees }} MIN_IMPURITY_DECREASE=0.00,0.05,0.10,0.15,0.20,0.25,0.30,0.35,0.40,0.45,0.50 python -m src.experiments.run
+          EXPERIMENT=max_leaf_nodes REPETITIONS=1 TREES=${{ matrix.trees }} MAX_LEAF_NODES=3,10,32,100,320,1000,3200,10000 python -m src.experiments.run
 
       - uses: actions/upload-artifact@v4
         with:
