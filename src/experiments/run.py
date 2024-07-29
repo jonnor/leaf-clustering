@@ -391,22 +391,41 @@ def config_number_list(var : str, default : str, delim=',') -> list[int]:
 
     return values
 
+def get_depth_limiter():
+
+    depth_limiters = dict(
+        min_samples_leaf = config_number_list('MIN_SAMPLES_LEAF', ''),
+        min_samples_split = config_number_list('MIN_SAMPLES_SPLIT', ''),
+        max_depth = config_number_list('MAX_DEPTH', ''),
+        max_leaf_nodes = config_number_list('MAX_LEAF_NODES', ''),
+        min_impurity_decrease = config_number_list('MIN_IMPURITY_DECREASE', ''),
+    )
+
+    depth_limiter = None # tuple: (metric, value)
+    depth_limiters_configured = [ k for k, v in depth_limiters.items() if v ]
+    assert len(depth_limiters_configured) == 1, depth_limiters_configured
+    metric = depth_limiters_configured[0]
+    value = depth_limiters[metric]
+
+    return metric, value
+
 def main():
     
     repetitions = int(os.environ.get('REPETITIONS', '3'))
     folds = int(os.environ.get('FOLDS', '5'))
     trees = config_number_list('TREES', '100')
-    min_samples_leaf = config_number_list('MIN_SAMPLES_LEAF', '1')
     experiment = os.environ.get('EXPERIMENT', 'tree-minsamplesleaf')
     feature_dtype = os.environ.get('FEATURE_DTYPE', None)
-    max_depth = config_number_list('MAX_DEPTH', '')
+
+    depth_limiter_metric, depth_limiter_values = get_depth_limiter()
 
     experiments = {}
     for t in trees:
 
-        for d in max_depth:
-            name = f'{experiment}-{t}-{d}'
-            config = dict(n_estimators=t, max_depth=d, dtype=feature_dtype)
+        for limit in depth_limiter_values:
+            name = f'{experiment}-{t}-{limit}'
+            config = dict(n_estimators=t, dtype=feature_dtype)
+            config[depth_limiter_metric] = limit
             if feature_dtype == 'int16':
                 config['target_max'] = (2**15)-1
             experiments[name] = config
