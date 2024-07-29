@@ -1,7 +1,7 @@
 
 ## TODO
 
-- Analysis. Include just-quantization in comparison. 8 bits
+- Analysis. Include just-quantization in comparison. At least 8 bits
 - Experiments. Run for all depth optimization strategies. Verify showing same tendencies.
 - Setup full evaluation pipeline for HAR
 - Setup model export and microcontroller firmware
@@ -12,15 +12,7 @@ Rename the experiments. hard, soft-f32, soft-u8, cluster-u8, soft-u4, cluster-u4
 ## Open questions
 
 
-#### What range of models are feasible at all
 
-model size total. `<< 1MB`, preferably 10-100 kB
-
-Plot model size estimates for datasets.
-With majority voting, best case scenario.
-
-median around 10kB.
-Majority under 100kB. OK.
 
 #### What differences are there between soft and hard voting
 
@@ -74,10 +66,54 @@ Maybe also 4-bit quantization with or without clustering?
 
 Shown for n_samples_leaf.
 Assuming the same behavior from other restrictions on depth, such as max_depth.
-TODO: run an experiment also with max depth, to confirm this
 
-20,18,16,14,12,10,8,6,4,2
-20,16,12,8,4
+max_depth also shows this behavior.
+TODO: run with the rest of the limiters
+
+#### max_depth
+`MAX_DEPTH=20,18,16,14,12,10,8,6,4,2`
+Could have dropped 20 and 18
+
+#### min_samples_leaf
+`MIN_SAMPLES_LEAF=1,2,4,8,16,32,64,128`
+
+#### min_samples_split
+`MIN_SAMPLES_SPLIT=2,4,8,16,32,64,128,256`
+
+#### max_leaf_nodes
+`MAX_LEAF_NODES=3,10,32,100,320,1000,3200,10000`
+Builds the tree in a best-first fashion rather than a depth-first fashion.
+5 to 10k was the approximate range for the min_samples_leaf sweep.
+
+? will it get more unique leaves from the start?
+
+#### min_impurity_decrease
+`MIN_IMPURITY_DECREASE=0.00,0.05,0.10,0.15,0.20,0.25,0.30,0.35,0.40,0.45,0.50`
+Default 0.0
+
+>>> ','.join((f'{s:.2f}' for s in numpy.linspace(0.0, 0.5, 11)))
+'0.00,0.05,0.10,0.15,0.20,0.25,0.30,0.35,0.40,0.45,0.50'
+
+gini impurity naturally ranges between 0 and 1.
+Gini is the default criteria for classification.
+
+#### ccp_alpha
+`
+0.0 -> ?
+`
+
+To get an idea of what values of ccp_alpha could be appropriate,
+scikit-learn provides DecisionTreeClassifier.cost_complexity_pruning_path
+that returns the effective alphas and the corresponding total leaf impurities at each step of the pruning process.
+Data-dependent method.
+
+
+#### min_weight_fraction_leaf
+Mostly to deal with imbalance?
+Interacts with class weights, if set.
+Related to min_samples_split, but weighted
+
+
 
 
 #### How well does leaf clustering work?
@@ -100,6 +136,21 @@ Compare in terms of size and inference time.
 - micromlgen (float, ? )
 
 On HAR datasets.
+
+
+
+## Answered
+
+
+#### What range of models are feasible at all
+
+model size total. `<< 1MB`, preferably 10-100 kB
+
+Plot model size estimates for datasets.
+With majority voting, best case scenario.
+
+median around 10kB.
+Majority under 100kB. OK.
 
 
 ## Out-of-scope

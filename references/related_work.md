@@ -86,7 +86,50 @@ Smartphone collection. 19 individuals.
 Not fixed orientation or placement of the smartphone,
 
 
+# Ideas
+
+### Positional encoding in demand trees
+
+IIR or FIR filters (convolution) can be used.
+Doing a single level of adaptive filters is already quite powerful.
+Traditional non-neural / non-backprop algorithms like RF limited because this is not immediately available.
+The kernels could be selected randomly (see Rocket).
+Or use some standard basis functions or filters.
+
+Would want to aggregate the outputs of such a kernel,
+to make it accessible to an RF classifier.
+- mean should allow to determine
+- max should allow to determine whether a given subsequence was present (at any location).
+- adding the kernel sum at all points as deterministic feature indices, should allow a concept of location
+But shift invariance is hard to do.
+
+For many filters/kernel running with step=1 might give very correlated outputs, not particularly informative.
+Other kernels such as an edge detector may need to run on each step.
+Would save a lot of computation by going step 2,4,8 etc.
+Dilation might be a relevant concept here.
+Ideally the step size would be matched to the kernel type.
+Sample rate adaption also highly releated.
+
 # Hyperparameter tuning
+
+## Best first trees
+
+best-first (leaf-wise) is an alternative tree growth strategy to the traditional depth-first (level-wise).
+
+Best-first Decision Tree Learning (Thesis, Master of Science (MSc)).
+Shi, H. (2007).
+The University of Waikato, Hamilton, New Zealand.
+Retrieved from https://hdl.handle.net/10289/2317
+
+In theory produces better trees when the number of leaves are restricted.
+
+https://datascience.stackexchange.com/questions/26699/decision-trees-leaf-wise-best-first-and-level-wise-tree-traverse
+
+Thesis compared to minimal cost-complexity pruning.
+
+This mode is used in scikit-learn when setting the `max_leaf_nodes` setting.
+This setting should allow to quite predictably adjust the size of the resulting tree/forest?
+
 
 ## Hyperparameters and Tuning Strategies for Random Forest
 
