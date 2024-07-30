@@ -39,10 +39,15 @@ jobs:
     runs-on: ubuntu-latest
     env:
       python-version: '3.10'
-      experiment: trees_max_depth
     strategy:
       matrix:
-        trees: [ 10 ]
+        depth_limiter: [
+            { experiment: min_samples_leaf, config: 'MIN_SAMPLES_LEAF=1,2,4,8,16,32,64,128' },
+            { experiment: min_samples_split, config: 'MIN_SAMPLES_SPLIT=2,4,8,16,32,64,128,256' },
+            { experiment: max_leaf_nodes, config: 'MAX_LEAF_NODES=3,10,32,100,320,1000,3200,10000' },
+            { experiment: min_impurity_decrease, config: 'MIN_IMPURITY_DECREASE=0.00,0.05,0.10,0.15,0.20,0.25,0.30,0.35,0.40,0.45,0.50' },
+            { experiment: max_depth, config: 'MAX_DEPTH=20,18,16,14,12,10,8,6,4,2' },
+        ]
 
     steps:
       - uses: actions/checkout@v4
@@ -75,9 +80,9 @@ jobs:
 
       - name: Run experiments
         run: |
-          EXPERIMENT=min_samples_split REPETITIONS=1 TREES=${{ matrix.trees }} MIN_SAMPLES_SPLIT=2,4,8,16,32,64,128,256 python -m src.experiments.run
+           EXPERIMENT=${{ matrix.depth_limiter.experiment }} ${{ matrix.depth_limiter.config }} REPETITIONS=1 TREES=10 python -m src.experiments.run
 
       - uses: actions/upload-artifact@v4
         with:
-          name: openml-cc18-results-trees-${{ matrix.trees }}-max_depth-${{ matrix.max_depth }}
+          name: openml-cc18-results-depth-limiter-${{ matrix.depth_limiter.experiment }}
           path: output/results/
