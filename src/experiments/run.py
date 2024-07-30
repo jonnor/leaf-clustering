@@ -387,8 +387,6 @@ def config_number_list(var : str, default : str, delim=',') -> list[int]:
     tok = s.split(delim)
     values = [ autoparse_number(v.strip()) for v in tok if v.strip() ] 
 
-    print(tok, values)
-
     return values
 
 def get_depth_limiter():
@@ -454,12 +452,11 @@ def main():
             quantizer = Quantizer(dtype=config['dtype'],
                 max_quantile=0.001, out_max=config['target_max'])
 
+        rf_hyperparams_names = set(config) - set(['target_max', 'dtype'])
+        rf_hyperparams = { k: config[k] for k in rf_hyperparams_names }
+
         # classifier
-        rf = RandomForestClassifier(
-            n_estimators=config.get('n_estimators', 10),
-            min_samples_leaf=config.get('min_samples_leaf', 1),
-            max_depth=config.get('max_depth', None),
-        )
+        rf = RandomForestClassifier(**rf_hyperparams)
         p.append(rf)
 
         run_id = uuid.uuid4().hex.upper()[0:6] + f'_{experiment}'
