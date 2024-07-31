@@ -25,8 +25,12 @@ Found DT-Rec and DT-Arr to be pareto optimal over DT-Loop and Naive.
 
 
 ## Ultra-compact Binary Neural Networks for Human Activity Recognition on RISC-V Processors
+https://dl.acm.org/doi/abs/10.1145/3457388.3458656
+https://arxiv.org/abs/2205.12781v1
 2021.
 Francesco Daghero et. al
+
+Code public at https://github.com/francescodaghero/ultracompactBNN for Pulpissimo RISC-V
 
 Compared RF and Binary Neural Network.
 On UniMiB-SHAR and a proprietary dataset.
@@ -63,6 +67,17 @@ But may also need more powerful feature engineering.
 also tests on UniMiB. Also struggled to RF above 60%.
 
 "High-Level Features for Human Activity Recognition and Modeling" reached up to 67.3% accuracy on UniMiB SHAR.
+
+Thesis: Most of performance gain of BNN over RF comes from the convolutional layer
+
+> our results of Section 4 show that, for HAR, a good accuracy can be obtained with 1D BNNs including as little as 2 or 4 channels
+
+For Walk dataset 2x layers with 2 channels, 7 kernel length outperformed RF features.
+For UniMiB, needed 3 layers and additional pooling. Conv(8,15),Conv(32,7),Pool(4,4),Conv(32,7).
+RF uses 1-2 orders of magnitude less CPU cycles.
+
+? dilated should have helped with the larger receptive field for UniMiB.
+Maybe even downsampling.
 
 
 #### New machine learning approaches for real-life human activity recognition using smartphone sensor-based data
@@ -142,6 +157,21 @@ References many other relevant works.
 Does not consider ensembles. Only CART and J48.
 
 
+### A time-efficient convolutional neural network model in human activity recognition
+https://link.springer.com/article/10.1007/S11042-020-10435-1
+
+> find that with removing the pooling layers and instead adding strides to convolution layers,
+> the computational time will decrease notably while the model performance will not change or in some cases will even improve.
+
+> impact of applying fast fourier transform (FFT) to inputs before training learning algorithm.
+> It will be shown that this preprocessing will enhance the model performance.
+
+### Deep Neural Networks for Sensor-Based Human Activity Recognition Using Selective Kernel Convolution
+https://ieeexplore.ieee.org/abstract/document/9507456
+2021.
+
+> an attention idea to perform kernel selection among multiple branches with different RFs (receptive fields)
+> it can achieve a higher recognition accuracy under a similar computing budget.
 
 # Hardware acceleration
 
@@ -149,7 +179,7 @@ Does not consider ensembles. Only CART and J48.
 
 Built into ST IMUs. Those with part numbers ending in -X.
 Decision tree classifier. With feature extraction.
-No support for multiple decision trees/ensembles.
+? No support for multiple decision trees/ensembles
 https://www.st.com/content/st_com/en/ecosystems/MEMS-Sensors-Ecosystem-for-Machine-Learning.html
 https://github.com/STMicroelectronics/STMems_Machine_Learning_Core
 

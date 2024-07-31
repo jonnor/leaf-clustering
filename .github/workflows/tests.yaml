@@ -44,8 +44,8 @@ jobs:
         depth_limiter: [
             { experiment: min_samples_leaf, config: 'MIN_SAMPLES_LEAF=1,2,4,8,16,32,64,128' },
             { experiment: min_samples_split, config: 'MIN_SAMPLES_SPLIT=2,4,8,16,32,64,128,256' },
-            { experiment: max_leaf_nodes, config: 'MAX_LEAF_NODES=3,10,32,100,320,1000,3200,10000' },
-            { experiment: min_impurity_decrease, config: 'MIN_IMPURITY_DECREASE=0.00,0.05,0.10,0.15,0.20,0.25,0.30,0.35,0.40,0.45,0.50' },
+            { experiment: max_leaf_nodes, config: 'MAX_LEAF_NODES=3,5,11,20,38,73,136,256,480,900,1687,3162' },
+            { experiment: min_impurity_decrease, config: 'MIN_IMPURITY_DECREASE=0.00,0.0001,0.0002,0.0004,0.0008,0.0016,0.0032,0.0063,0.0126,0.0251,0.0501,0.1' },
             { experiment: max_depth, config: 'MAX_DEPTH=20,18,16,14,12,10,8,6,4,2' },
         ]
 

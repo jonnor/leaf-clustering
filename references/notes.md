@@ -87,12 +87,19 @@ Builds the tree in a best-first fashion rather than a depth-first fashion.
 
 ? will it get more unique leaves from the start?
 
+','.join(numpy.logspace(0.5, 3.5, num=12).astype(int).astype(str))
+'3,5,11,20,38,73,136,256,480,900,1687,3162'
+
 #### min_impurity_decrease
 `MIN_IMPURITY_DECREASE=0.00,0.05,0.10,0.15,0.20,0.25,0.30,0.35,0.40,0.45,0.50`
 Default 0.0
 
 >>> ','.join((f'{s:.2f}' for s in numpy.linspace(0.0, 0.5, 11)))
 '0.00,0.05,0.10,0.15,0.20,0.25,0.30,0.35,0.40,0.45,0.50'
+
+','.join(numpy.logspace(-4, -1, num=11).round(4).astype(str))
+'0.0001,0.0002,0.0004,0.0008,0.0016,0.0032,0.0063,0.0126,0.0251,0.0501,0.1'
+
 
 gini impurity naturally ranges between 0 and 1.
 Gini is the default criteria for classification.
