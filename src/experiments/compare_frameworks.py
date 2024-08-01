@@ -10,7 +10,7 @@ import micromlgen
 
 from emlearn.evaluate.size import get_program_size, check_build_tools
 
-from src.experiments.metrics import unique_features
+from src.experiments.metrics import unique_features, feature_counts
 
 def export_emlearn(estimator, inference='loadable', dtype='int16_t', **kwargs):
 
@@ -89,6 +89,10 @@ def main():
         estimator = pickle.load(f)
 
     m = estimator
+
+    counts = feature_counts(m)
+    multi = counts[counts > 1]
+    print('features used more than once', len(multi))
 
     features = unique_features(m)
     print('unique features', features)
