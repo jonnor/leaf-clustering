@@ -12,7 +12,6 @@ Author: Jon Nordby
 
 import os
 import glob
-from urllib.request import urlretrieve
 
 import pandas
 import numpy
