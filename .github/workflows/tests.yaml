@@ -38,6 +38,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       python-version: '3.10'
+    strategy:
+      matrix:
+        dataset: [ 'uci_har', 'pamap2' ]
 
     steps:
       - uses: actions/checkout@v4
@@ -70,12 +73,12 @@ jobs:
 
       - name: Run
         run: |
-           python -m src.experiments.har
+           python -m src.experiments.har --dataset ${{ matrix.dataset }}
 
       - uses: actions/upload-artifact@v4
         with:
-          name: har-uci-results
-          path: har_results.parquet
+          name: results-${{ matrix.dataset }}
+          path: output/results/har
 
 
   experiments:
