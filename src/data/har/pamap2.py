@@ -8,6 +8,7 @@ Author: Jon Nordby
 """
 
 import os
+import zipfile
 
 import pandas
 
