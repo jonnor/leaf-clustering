@@ -32,6 +32,17 @@ def tree_leaves(model, a=None, b=None):
     leaves = [ numpy.count_nonzero((e.tree_.children_left == -1) & (e.tree_.children_right == -1)) for e in trees ]
     return numpy.sum(leaves)
 
+def unique_features(model, a=None, b=None):
+    """
+    Total number of features utilized
+    """
+    trees = get_tree_estimators(model)
+    features = []
+    for e in trees:
+        features += list(e.tree_.feature)
+    unique_features = numpy.unique(features)
+    return len(unique_features)
+
 def unique_leaves(model, a=None, b=None):
     """
     Number of unique leaf nodes

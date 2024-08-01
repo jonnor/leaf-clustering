@@ -1,4 +1,7 @@
 
+import pickle
+import sys
+
 import pandas
 
 import emlearn
@@ -6,6 +9,8 @@ import m2cgen
 import micromlgen
 
 from emlearn.evaluate.size import get_program_size, check_build_tools
+
+from src.experiments.metrics import unique_features
 
 def export_emlearn(estimator, inference='loadable', dtype='int16_t', **kwargs):
 
@@ -72,14 +77,21 @@ def main():
 
     # One directory per model
     # Select N models, of various sizes, for each dataset
-    
+
+    estimator_path = sys.argv[1]
+
     platforms = pandas.DataFrame.from_records([
         ('arm', 'Cortex-M0'),
         ('arm', 'Cortex-M4F'),
     ], columns=['platform', 'cpu'])
 
+    with open(estimator_path, 'rb') as f:
+        estimator = pickle.load(f)
 
-    m = 
+    m = estimator
+
+    features = unique_features(m)
+    print('unique features', features)
 
     ce = export_emlearn(m)
     c2 = export_m2cgen(m)
