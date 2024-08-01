@@ -164,13 +164,15 @@ def download(out_path, force=False):
 
     download_url = 'https://archive.ics.uci.edu/static/public/231/pamap2+physical+activity+monitoring.zip'
 
-    exists = os.path.exists(os.path.join(out_path, 'DataCollectionProtocol.pdf'))
+    check_path = os.path.join(out_path, 'DataCollectionProtocol.pdf')
+    exists = os.path.exists(check_path)
     if exists and not force:
         # already exists
         return False    
 
     print('Downloading dataset to', out_path)
     download_unpack_zip(download_url, out_path)
+    assert os.path.exists(check_path), os.listdir(out_path)
     return True
 
 def main():
