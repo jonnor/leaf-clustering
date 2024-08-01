@@ -68,8 +68,10 @@ def extract_windows(sensordata : pandas.DataFrame,
 
     groups = sensordata.groupby(groupby)
 
-    windows = []
+
     for group_idx, group_df in groups:
+
+        windows = []
 
         # make sure order is correct
         group_df = group_df.reset_index().set_index('time').sort_index()
@@ -79,6 +81,7 @@ def extract_windows(sensordata : pandas.DataFrame,
         length = len(group_df)
         while win_start < length:
             win_end = win_start + window_length
+            # ignore partial window at the end
             if win_end > length:
                 break
             
@@ -86,39 +89,73 @@ def extract_windows(sensordata : pandas.DataFrame,
             win['window'] = win.index[0]
             assert len(win) == window_length, (len(win), window_length)
 
+   
             windows.append(win)
+
             win_start += window_hop
 
-    out = pandas.concat(windows)
-    out = out.set_index(groupby + ['window'])
+        yield windows
 
-    return out
 
-def extract_features(windows : pandas.DataFrame, columns : list[str], groupby):
+def extract_features(sensordata : pandas.DataFrame,
+    columns : list[str],
+    groupby,
+    window_length = 128,
+    window_hop = 64,
+    quant_div = 4,
+    quant_depth = 6,
+    label_column='activity',
+    ):
+    """
+    Convert sensor data into fixed-sized time windows and extact features
+    """
 
     import torch
 
-    transform = Quant()
-
-    def extract(df, column):
-        column_data = df[column].values.astype(numpy.float32)
-        win = torch.from_numpy(column_data).reshape(1,1,-1)
-        X = transform.fit_transform(win, Y=None)
-        print('w', win.shape, win.dtype, X.shape)
-        return X
-
-    # TODO: add names to features
+    transform = Quant(div=quant_div, depth=quant_depth)
 
     features = []
-    for c in columns:
 
-        # FIXME: use vectorized torch operation instead of apply loop
-        ww = windows.groupby(groupby + ['window'])
-        X = ww.apply(extract, column=c)
+    def assign_window_label(labels, majority=0.66):
+        """
+        Assign the most common label to window, if it is above the @majority threshold
+        Otherwise return NA
+        """
 
-        features.append(X)
-        print(X.shape)
+        counts = labels.value_counts()
+        threshold = majority * len(labels)
+        if counts.iloc[0] > threshold:
+            return counts.iloc[0]
+        else:
+            return None
 
+    # Split into fixed-length windows
+    generator = extract_windows(sensordata, window_length, window_hop, groupby=groupby)
+    for windows in generator:
+    
+        # Extract features
+        f = []
+        for c in columns:
+
+            values = numpy.stack([w[c] for w in windows]).astype(numpy.float32)
+            tensor = torch.from_numpy(values).reshape(len(values),1,window_length)
+            X = transform.fit_transform(tensor, Y=None)
+            f.append(X)
+
+        ff = numpy.concatenate(f, axis=-1)
+        # TODO: add names to features
+        df = pandas.DataFrame(ff)
+
+        # Attach labels
+        df[label_column] = [ assign_window_label(w[label_column]) for w in windows ]
+
+        # Combine with identifying information
+        index_columns = list(groupby + ['window'])
+        for idx_column in index_columns:
+            df[idx_column] = [w[idx_column].iloc[0] for w in windows]
+        df = df.set_index(index_columns)
+
+        features.append(df)
 
     out = pandas.concat(features)
     return out
@@ -126,12 +163,18 @@ def extract_features(windows : pandas.DataFrame, columns : list[str], groupby):
 
 def main():
 
-    #dataset = 'pamap2'
+    dataset = 'pamap2'
     dataset = 'uci_har'
 
     dataset_config = {
-        'uci_har': dict(groups=['subject', 'experiment']),
-        'pamap2': dict(groups=['subject']),
+        'uci_har': dict(
+            groups=['subject', 'experiment'],
+            data_columns = ['acc_x', 'acc_y', 'acc_z'],
+        ),
+        'pamap2': dict(
+            groups=['subject'],
+            data_columns = ['hand_acceleration_16g_x', 'hand_acceleration_16g_y', 'hand_acceleration_16g_z'],
+        ),
     }
 
     data_dir = './data/processed'
@@ -142,19 +185,27 @@ def main():
     data = pandas.read_parquet(data_path)
 
 
-    print(data.index.names)
+    #print(data.index.names)
     print(data.columns)
     #print(data.head())
 
     groups = dataset_config[dataset]['groups']
-    data_columns = ['acc_x', 'acc_y', 'acc_z']
-    windows = extract_windows(data, window_length=128, window_hop=64, groupby=groups)
+    data_columns = dataset_config[dataset]['data_columns']
+    #windows = extract_windows(data, window_length=128, window_hop=64, groupby=groups)
 
     data_load_duration = time.time() - data_load_start
-    log.info('data-loaded', dataset=dataset, samples=len(windows), duration=data_load_duration)
+    log.info('data-loaded', dataset=dataset, samples=len(data), duration=data_load_duration)
 
-    ww = windows.groupby(groups + ['window'])
-    features = ww.apply(extract_features, columns=data_columns, groupby=groups)
+
+    feature_extraction_start = time.time()
+    features = extract_features(data, columns=data_columns, groupby=groups)
+
+    feature_extraction_duration = time.time() - feature_extraction_start
+    log.info('feature-extraction-done',
+        dataset=dataset,
+        instances=len(features),
+        duration=feature_extraction_duration,
+    )
 
 
 if __name__ == '__main__':
