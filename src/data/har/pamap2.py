@@ -9,6 +9,7 @@ Author: Jon Nordby
 
 import os
 import zipfile
+import shutil
 
 import pandas
 
@@ -42,6 +43,9 @@ def load_data(path) -> pandas.DataFrame:
 
     NOTE: Takes some tens of seconds
     """
+
+    if os.path.exists(os.path.join(path, 'PAMAP2_Dataset')):
+        path = os.path.join(os.path.join(path, 'PAMAP2_Dataset'))
 
     # Prepare metadata
     a = load_activities().items()
@@ -165,11 +169,11 @@ def download(out_path, force=False):
 
     download_url = 'https://archive.ics.uci.edu/static/public/231/pamap2+physical+activity+monitoring.zip'
 
-    check_path = os.path.join(out_path, 'DataCollectionProtocol.pdf')
+    check_path = os.path.join(out_path, 'PAMAP2_Dataset', 'DataCollectionProtocol.pdf')
     exists = os.path.exists(check_path)
     if exists and not force:
         # already exists
-        return False    
+        return False  
 
     print('Downloading dataset to', out_path)
     download_unpack_zip(download_url, out_path)
