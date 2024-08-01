@@ -172,6 +172,12 @@ def download(out_path, force=False):
 
     print('Downloading dataset to', out_path)
     download_unpack_zip(download_url, out_path)
+
+    # a .zip in a .zip
+    archive_path = os.path.join(out_path, 'PAMAP2_Dataset.zip')
+    with zipfile.ZipFile(archive_path, 'r') as zipf:
+        zipf.extractall(out_path)
+
     assert os.path.exists(check_path), os.listdir(out_path)
     return True
 
