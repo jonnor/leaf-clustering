@@ -17,6 +17,8 @@ from urllib.request import urlretrieve
 import pandas
 import numpy
 
+from src.utils.download import download_unpack_zip
+
 def assert_data_correct(data):
 
     # check dataset size
@@ -135,21 +137,6 @@ def load_data(path) -> pandas.DataFrame:
     assert_data_correct(data)
 
     return data
-
-def download_unpack_zip(url, out):
-
-    import zipfile
-    import tempfile
-
-    if not os.path.exists(out):
-        os.makedirs(out)
-
-    with tempfile.TemporaryDirectory() as tempdir:
-        archive_path = os.path.join(tempdir, 'archive.zip')
-        urlretrieve(url, archive_path)
-
-        with zipfile.ZipFile(archive_path, 'r') as zipf:
-            zipf.extractall(out)
 
 
 def download(out_path=None, force=False):

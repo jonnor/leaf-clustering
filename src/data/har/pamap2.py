@@ -11,6 +11,9 @@ import os
 
 import pandas
 
+from src.utils.download import download_unpack_zip
+
+
 def assert_data_correct(data):
 
     # check dataset size
@@ -157,16 +160,34 @@ def load_packed(packed_path):
 
     return loaded
 
-# TODO: support downloading also
+def download(out_path, force=False):
+
+    download_url = 'https://archive.ics.uci.edu/static/public/231/pamap2+physical+activity+monitoring.zip'
+
+    exists = os.path.exists(os.path.join(out_path, 'DataCollectionProtocol.pdf'))
+    if exists and not force:
+        # already exists
+        return False    
+
+    print('Downloading dataset to', out_path)
+    download_unpack_zip(download_url, out_path)
+    return True
+
 def main():
 
-    dataset_path = '/data/emlearn/PAMAP2_Dataset/'
-    packed_path = 'pamap2.parquet'
+    dataset_path = 'data/raw/pamap2/'
+    packed_path = 'data/processed/pamap2.parquet'
 
+    downloaded = download(dataset_path)
     data = load_data(dataset_path)
+    packed_dir = os.path.dirname(packed_path)
+    if not os.path.exists(packed_dir):
+        os.makedirs(packed_dir)
     data.to_parquet(packed_path)
 
     loaded = load_packed(packed_path)
+    print('Raw:\t\t', dataset_path)
+    print('Packed\t\t', packed_path)
 
 
 if __name__ == '__main__':
