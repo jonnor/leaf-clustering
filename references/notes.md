@@ -5,6 +5,7 @@
 - Experiments. Run for all depth optimization strategies. Verify showing same tendencies.
 - Setup full evaluation pipeline for HAR
 - Setup model export and microcontroller firmware
+- Maybe try QUANT for feature engineering
 - Investigate hyperparameter for controlling leaf clustering
 
 Rename the experiments. hard, soft-f32, soft-u8, cluster-u8, soft-u4, cluster-u4 ?
