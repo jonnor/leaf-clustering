@@ -70,6 +70,7 @@ jobs:
       - name: Download data
         run: |
           python -m src.data.har.uci
+          python -m src.data.har.pamap2
 
       - name: Run
         run: |
