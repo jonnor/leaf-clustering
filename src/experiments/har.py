@@ -247,7 +247,7 @@ def main():
     df = results.rename(columns=lambda c: c.replace('param_', ''))
     display_columns = [
         'n_estimators',
-        'min_samples_split',
+        'min_samples_leaf',
         'mean_train_f1_micro',
         'mean_test_f1_micro',
     ]

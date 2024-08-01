@@ -6,7 +6,9 @@ def get_tree_estimators(estimator):
     Get the DecisionTree instances from ensembles or single-tree models
     """
 
-    estimator = estimator.named_steps['randomforestclassifier']
+    if hasattr(estimator, 'named_steps'):
+        # is a Pipeline, try to find the classifier
+        estimator = estimator.named_steps['randomforestclassifier']
 
     if hasattr(estimator, 'estimators_'):
         trees = [ e for e in estimator.estimators_]

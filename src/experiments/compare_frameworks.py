@@ -1,15 +1,11 @@
 
-from run_experiments import run_datasets, setup_data_pipeline
-
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.pipeline import make_pipeline
 import pandas
-
 
 import emlearn
 import m2cgen
 import micromlgen
+
+from emlearn.evaluate.size import get_program_size, check_build_tools
 
 def export_emlearn(estimator, inference='loadable', dtype='int16_t', **kwargs):
 
@@ -30,7 +26,6 @@ def export_micromlgen(estimator, **kwargs):
 
     return code
 
-from emlearn.evaluate.size import get_program_size, check_build_tools
 
 def generate_test_program(model_code, features):
 
@@ -69,25 +64,23 @@ def generate_test_program(model_code, features):
 
 def main():
 
+    # Include test data. Features + expected label. Small set, say 10x per class
+    # Inference code for each framework. One file per framework. Defines predict function
+    # Test program. Macros to select a framework.
+    #   Conditional include
+    # Measure program size with no/dummy framework
+
+    # One directory per model
+    # Select N models, of various sizes, for each dataset
+    
     platforms = pandas.DataFrame.from_records([
         ('arm', 'Cortex-M0'),
         ('arm', 'Cortex-M4F'),
     ], columns=['platform', 'cpu'])
 
-    dataset_path = 'data/datasets/151.parquet'
-    data = pandas.read_parquet(dataset_path)
-    X, Y, preprocessor = setup_data_pipeline(data)
 
-    # combine into a pipeline
-    pipeline = make_pipeline(
-        preprocessor,
-        RandomForestClassifier(n_estimators=10, max_depth=10),
-    )
+    m = 
 
-    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.30)
-    pipeline.fit(X_train, Y_train)
-
-    m = pipeline.named_steps['randomforestclassifier']
     ce = export_emlearn(m)
     c2 = export_m2cgen(m)
     cu = export_micromlgen(m)
