@@ -196,7 +196,7 @@ def run_pipeline(run, dataset, data_dir, out_dir):
         ),
     }
 
-    if not os.path.exits(out_dir):
+    if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
     data_path = os.path.join(data_dir, f'{dataset}.parquet')
