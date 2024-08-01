@@ -179,6 +179,9 @@ def main():
 
     downloaded = download(dataset_path)
     data = load_data(dataset_path)
+    packed_dir = os.path.dirname(packed_path)
+    if not os.path.exists(packed_dir):
+        os.makedirs(packed_dir)
     data.to_parquet(packed_path)
 
     loaded = load_packed(packed_path)
