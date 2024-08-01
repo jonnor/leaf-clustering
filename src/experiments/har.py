@@ -66,7 +66,7 @@ def extract_windows(sensordata : pandas.DataFrame,
     groupby : list[str],
     ):
 
-    groups = sensordata.groupby(groupby)
+    groups = sensordata.groupby(groupby, observed=True)
 
 
     for group_idx, group_df in groups:
@@ -96,6 +96,17 @@ def extract_windows(sensordata : pandas.DataFrame,
 
         yield windows
 
+def assign_window_label(labels, majority=0.66):
+    """
+    Assign the most common label to window, if it is above the @majority threshold
+    Otherwise return NA
+    """
+    counts = labels.value_counts(dropna=True)
+    threshold = majority * len(labels)
+    if counts.iloc[0] > threshold:
+        return counts.index[0]
+    else:
+        return None
 
 def extract_features(sensordata : pandas.DataFrame,
     columns : list[str],
@@ -115,19 +126,6 @@ def extract_features(sensordata : pandas.DataFrame,
     transform = Quant(div=quant_div, depth=quant_depth)
 
     features = []
-
-    def assign_window_label(labels, majority=0.66):
-        """
-        Assign the most common label to window, if it is above the @majority threshold
-        Otherwise return NA
-        """
-
-        counts = labels.value_counts()
-        threshold = majority * len(labels)
-        if counts.iloc[0] > threshold:
-            return counts.iloc[0]
-        else:
-            return None
 
     # Split into fixed-length windows
     generator = extract_windows(sensordata, window_length, window_hop, groupby=groupby)
@@ -164,16 +162,33 @@ def extract_features(sensordata : pandas.DataFrame,
 def main():
 
     dataset = 'pamap2'
-    dataset = 'uci_har'
+    #dataset = 'uci_har'
 
     dataset_config = {
         'uci_har': dict(
             groups=['subject', 'experiment'],
             data_columns = ['acc_x', 'acc_y', 'acc_z'],
+            classes = [
+                #'STAND_TO_LIE',
+                #'SIT_TO_LIE',
+                #'LIE_TO_SIT',
+                #'STAND_TO_SIT',
+                #'LIE_TO_STAND',
+                #'SIT_TO_STAND',
+                'STANDING', 'LAYING', 'SITTING',
+                'WALKING', 'WALKING_UPSTAIRS', 'WALKING_DOWNSTAIRS',
+            ],
         ),
         'pamap2': dict(
             groups=['subject'],
             data_columns = ['hand_acceleration_16g_x', 'hand_acceleration_16g_y', 'hand_acceleration_16g_z'],
+            classes = [
+                #'transient',
+                'walking', 'ironing', 'lying', 'standing',
+                'Nordic_walking', 'sitting', 'vacuum_cleaning',
+                'cycling', 'ascending_stairs', 'descending_stairs',
+                'running', 'rope_jumping',
+            ],
         ),
     }
 
@@ -184,13 +199,13 @@ def main():
     data_load_start = time.time()
     data = pandas.read_parquet(data_path)
 
-
     #print(data.index.names)
-    print(data.columns)
+    #print(data.columns)
     #print(data.head())
 
     groups = dataset_config[dataset]['groups']
     data_columns = dataset_config[dataset]['data_columns']
+    enabled_classes = dataset_config[dataset]['classes']
     #windows = extract_windows(data, window_length=128, window_hop=64, groupby=groups)
 
     data_load_duration = time.time() - data_load_start
@@ -199,14 +214,23 @@ def main():
 
     feature_extraction_start = time.time()
     features = extract_features(data, columns=data_columns, groupby=groups)
+    labeled = numpy.count_nonzero(features['activity'].notna())
 
     feature_extraction_duration = time.time() - feature_extraction_start
     log.info('feature-extraction-done',
         dataset=dataset,
-        instances=len(features),
+        total_instances=len(features),
+        labeled_instances=labeled,
         duration=feature_extraction_duration,
     )
 
+    # Drop windows without labels
+    features = features[features.activity.notna()]
+
+    # Keep only windows with enabled classes
+    features = features[features.activity.isin(enabled_classes)]
+
+    print(features['activity'].value_counts(dropna=False))
 
 if __name__ == '__main__':
     main()
