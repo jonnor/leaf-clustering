@@ -1,6 +1,7 @@
 
 import os
 import time
+import uuid
 
 import pandas
 import scipy.stats
@@ -165,11 +166,7 @@ def extract_features(sensordata : pandas.DataFrame,
     out = pandas.concat(features)
     return out
     
-
-def main():
-
-    #dataset = 'pamap2'
-    dataset = 'uci_har'
+def run_pipeline(run, dataset, data_dir, out_dir):
 
     dataset_config = {
         'uci_har': dict(
@@ -199,7 +196,8 @@ def main():
         ),
     }
 
-    data_dir = './data/processed'
+    if not os.path.exits(out_dir):
+        os.makedirs(out_dir)
 
     data_path = os.path.join(data_dir, f'{dataset}.parquet')
 
@@ -236,13 +234,51 @@ def main():
 
     print('Class distribution\n', features['activity'].value_counts(dropna=False))
 
-
     # Run train-evaluate
     results = evaluate(features, groupby='subject')
 
     # Save results
     results['dataset'] = dataset
-    results.to_parquet('har_results.parquet')
+    results['run'] = run
+    results_path = os.path.join(out_dir, f'r_{run}_{dataset}.results.parquet')
+    results.to_parquet(results_path)
+    print('Results written to', results_path)
+
+    return results
+
+def parse():
+    import argparse
+    parser = argparse.ArgumentParser(description='')
+
+    parser.add_argument('--out', metavar='FILE', type=str, default='',
+                        help='Where to put results')
+
+    parser.add_argument('--dataset', type=str, default='uci_har',
+                        help='Which dataset to use')
+    parser.add_argument('--data-dir', metavar='DIRECTORY', type=str, default='./data/processed',
+                        help='Where the input data is stored')
+    parser.add_argument('--out-dir', metavar='DIRECTORY', type=str, default='./output/results/har',
+                        help='Where to store results')
+
+    args = parser.parse_args()
+
+    return args
+
+
+def main():
+
+    args = parse()
+    dataset = args.dataset
+    out_dir = args.out_dir
+    data_dir = args.data_dir
+
+    run_id = uuid.uuid4().hex.upper()[0:6]
+
+    results = run_pipeline(dataset=args.dataset,
+        out_dir=args.out_dir,
+        data_dir=args.data_dir,
+        run=run_id,
+    )
 
     df = results.rename(columns=lambda c: c.replace('param_', ''))
     display_columns = [
