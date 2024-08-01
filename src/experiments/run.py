@@ -17,7 +17,7 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 import scipy.special
 
 from ..utils.parallel import ProgressParallel, joblib
-import .metrics
+from . import metrics
 
 from emlearn.preprocessing.quantizer import Quantizer
 import emlearn
