@@ -12,6 +12,7 @@ Author: Jon Nordby
 
 import os
 import glob
+from urllib.request import urlretrieve
 
 import pandas
 import numpy
@@ -135,6 +136,34 @@ def load_data(path) -> pandas.DataFrame:
 
     return data
 
+def download_unpack_zip(url, out):
+
+    import zipfile
+    import tempfile
+
+    if not os.path.exists(out):
+        os.makedirs(out)
+
+    with tempfile.TemporaryDirectory as tempdir:
+        archive_path = os.path.join(tempdir.name, 'archive.zip')
+        urlretrieve(download_url, archive_path)
+
+        with zipfile.ZipFile(archive_path, 'r') as zipf:
+            zipf.extractall(out)
+
+
+def download(out_path=None, force=False):
+
+    exists = os.path.exists(os.path.join(out_path, 'activity_labels.txt'))
+    if exists and not force:
+        # already exists
+        return False    
+
+    download_url = 'https://www.archive.ics.uci.edu/static/public/341/smartphone+based+recognition+of+human+activities+and+postural+transitions.zip'
+
+    print('Downloading dataset to', out_path)
+    download_unpack_zip(download_url, out_path)
+    return True
 
 def load_packed(packed_path):
 
@@ -143,17 +172,18 @@ def load_packed(packed_path):
 
     return loaded
 
-# TODO: support downloading also
 def main():
 
     dataset_path = 'data/raw/uci_har_smartphone/'
-    packed_path = 'uci_har.parquet'
+    packed_path = 'data/processed/uci_har.parquet'
 
+    downloaded = download(dataset_path)
     data = load_data(dataset_path)
     data.to_parquet(packed_path)
 
     loaded = load_packed(packed_path)
-
+    print('Raw:\t\t', dataset_path)
+    print('Packed\t\t', packed_path)
 
 if __name__ == '__main__':
     main()
