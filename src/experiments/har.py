@@ -14,6 +14,7 @@ from sklearn.model_selection import GridSearchCV, GroupShuffleSplit
 from emlearn.evaluate.trees import model_size_bytes
 
 from ..features.quant import Quant
+from ..experiments import metrics
 
 log = structlog.get_logger()
 
@@ -26,7 +27,7 @@ def evaluate(windows : pandas.DataFrame, groupby, random_state=1, n_splits=5, la
     hyperparameters = {
         'n_estimators': [ 10 ],
         "max_features": [ 0.30 ],
-        'min_samples_split': [ 2**n for n in range(0, 10) ],
+        'min_samples_leaf': [ 2**n for n in range(0, 10) ],
     }
 
     clf = RandomForestClassifier(random_state = random_state, n_jobs=1, class_weight = "balanced")
@@ -39,8 +40,12 @@ def evaluate(windows : pandas.DataFrame, groupby, random_state=1, n_splits=5, la
         scoring={
             # our predictive model metric
             'f1_micro': f1_micro,
+
             # metrics for the model costs
-            'size': model_size_bytes,
+            'nodes': metrics.tree_nodes,
+            'leaves': metrics.tree_leaves,
+            'leasize': metrics.leaf_size,
+            'uniqueleaves': metrics.unique_leaves,
         },
         refit='f1_micro',
         cv=splitter,

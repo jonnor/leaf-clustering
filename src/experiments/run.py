@@ -17,6 +17,7 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 import scipy.special
 
 from ..utils.parallel import ProgressParallel, joblib
+import .metrics
 
 from emlearn.preprocessing.quantizer import Quantizer
 import emlearn
@@ -29,54 +30,6 @@ import structlog
 
 log = structlog.get_logger()
 
-def get_tree_estimators(estimator):
-    """
-    Get the DecisionTree instances from ensembles or single-tree models
-    """
-
-    estimator = estimator.named_steps['randomforestclassifier']
-
-    if hasattr(estimator, 'estimators_'):
-        trees = [ e for e in estimator.estimators_]
-    else:
-        trees = [ estimator ]
-    return trees
-
-def tree_nodes(model, a=None, b=None):
-    """
-    Number of nodes total
-    """
-    trees = get_tree_estimators(model)
-    nodes = [ len(e.tree_.children_left) for e in trees ]
-    return numpy.sum(nodes)
-
-def tree_leaves(model, a=None, b=None):
-    """
-    """
-    trees = get_tree_estimators(model)
-    leaves = [ numpy.count_nonzero((e.tree_.children_left == -1) & (e.tree_.children_right == -1)) for e in trees ]
-    return numpy.sum(leaves)
-
-def unique_leaves(model, a=None, b=None):
-    """
-    """
-    trees = get_tree_estimators(model)
-
-    ll = []
-    for e in trees:
-        l = e.tree_.value[(e.tree_.children_left == -1) & (e.tree_.children_right == -1)]
-        ll.append(l)
-    leaves = numpy.squeeze(numpy.concatenate(ll))
-
-    return len(numpy.unique(leaves, axis=0))
-
-def leaf_size(model, a=None, b=None):
-    """
-    Average size of leaves
-    """
-    trees = get_tree_estimators(model)
-    sizes = [ e.tree_.value[(e.tree_.children_left == -1) & (e.tree_.children_right == -1)].shape[-1] for e in trees ]
-    return numpy.median(sizes)
 
 
 def quantize_probabilities(p, bits=8):
@@ -263,10 +216,10 @@ def cross_validate(pipeline, X, Y,
     ):
 
     scoring = {
-        'nodes': tree_nodes,
-        'leaves': tree_leaves,
-        'leasize': leaf_size,
-        'uniqueleaves': unique_leaves,
+        'nodes': metrics.tree_nodes,
+        'leaves': metrics.tree_leaves,
+        'leasize': metrics.leaf_size,
+        'uniqueleaves': metrics.unique_leaves,
         'roc_auc': get_scorer('roc_auc_ovo_weighted'),
     }
 
