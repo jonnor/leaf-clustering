@@ -9,7 +9,7 @@ import structlog
 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import f1_score, make_scorer
-from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import GridSearchCV, GroupShuffleSplit
 
 from emlearn.evaluate.trees import model_size_bytes
 
@@ -17,23 +17,21 @@ from ..features.quant import Quant
 
 log = structlog.get_logger()
 
-def evaluate():
+def evaluate(windows : pandas.DataFrame, groupby, random_state=1, n_splits=5, label_column='activity'):
 
-    # TODO: setup data loading
-    # FIXME: setup subject-based cross validation
-
+    # Setup subject-based cross validation
+    splitter = GroupShuffleSplit(n_splits=n_splits, test_size=0.25, random_state=random_state)
 
     # Spaces to search for hyperparameters
     hyperparameters = {
-        'n_estimators': [ 5, 10 ],
-        "max_features": numpy.linspace(0.30, 0.90, 10),
+        'n_estimators': [ 10 ],
+        "max_features": [ 0.30 ],
         'min_samples_split': [ 2**n for n in range(0, 10) ],
     }
 
-    clf = RandomForestClassifier(random_state = 0, n_jobs=1, class_weight = "balanced")
+    clf = RandomForestClassifier(random_state = random_state, n_jobs=1, class_weight = "balanced")
 
-
-    f1_micro = make_scorer(f1_score, average="micro")
+    f1_micro = 'f1_micro'
 
     search = GridSearchCV(
         clf,
@@ -45,20 +43,24 @@ def evaluate():
             'size': model_size_bytes,
         },
         refit='f1_micro',
-        cv=5,
+        cv=splitter,
         return_train_score=True,
         n_jobs=4,
         verbose=2,
     )
 
+    feature_columns = sorted(set(windows.columns) - set([label_column]))
+    assert 'subject' not in feature_columns
+    assert 'activity' not in feature_columns
+    X = windows[feature_columns]
+    Y = windows[label_column]
+    groups = windows.index.get_level_values(groupby)
+    search.fit(X, Y, groups=groups)
 
-    # check the results on the validation set
-    #hypothesis = clf.predict(features_validation)
-    #validation_score = f1_score(validation_y, hypothesis, average="micro")
+    results = pandas.DataFrame(search.cv_results_)
 
-    # check also the results on the test set
-    hypothesis = clf.predict(features_test)
-    test_score = f1_score(self.test_y, hypothesis, average="micro")
+    return results
+
 
 def extract_windows(sensordata : pandas.DataFrame,
     window_length : int,
@@ -161,8 +163,8 @@ def extract_features(sensordata : pandas.DataFrame,
 
 def main():
 
-    dataset = 'pamap2'
-    #dataset = 'uci_har'
+    #dataset = 'pamap2'
+    dataset = 'uci_har'
 
     dataset_config = {
         'uci_har': dict(
@@ -201,16 +203,13 @@ def main():
 
     #print(data.index.names)
     #print(data.columns)
-    #print(data.head())
 
     groups = dataset_config[dataset]['groups']
     data_columns = dataset_config[dataset]['data_columns']
     enabled_classes = dataset_config[dataset]['classes']
-    #windows = extract_windows(data, window_length=128, window_hop=64, groupby=groups)
 
     data_load_duration = time.time() - data_load_start
     log.info('data-loaded', dataset=dataset, samples=len(data), duration=data_load_duration)
-
 
     feature_extraction_start = time.time()
     features = extract_features(data, columns=data_columns, groupby=groups)
@@ -230,7 +229,25 @@ def main():
     # Keep only windows with enabled classes
     features = features[features.activity.isin(enabled_classes)]
 
-    print(features['activity'].value_counts(dropna=False))
+    print('Class distribution\n', features['activity'].value_counts(dropna=False))
+
+
+    # Run train-evaluate
+    results = evaluate(features, groupby='subject')
+
+    # Save results
+    results['dataset'] = dataset
+    results.to_parquet('har_results.parquet')
+
+    df = results.rename(columns=lambda c: c.replace('param_', ''))
+    display_columns = [
+        'n_estimators',
+        'min_samples_split',
+        'mean_train_f1_micro',
+        'mean_test_f1_micro',
+    ]
+
+    print('Results\n', df[display_columns])
 
 if __name__ == '__main__':
     main()
