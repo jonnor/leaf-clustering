@@ -2,6 +2,7 @@
 import os
 import time
 import uuid
+import pickle
 
 import pandas
 import scipy.stats
@@ -16,20 +17,17 @@ from emlearn.evaluate.trees import model_size_bytes
 
 from ..features.quant import Quant
 from ..experiments import metrics
+from ..utils.config import config_number_list
+
 
 log = structlog.get_logger()
 
-def evaluate(windows : pandas.DataFrame, groupby, random_state=1, n_splits=5, label_column='activity'):
+
+def evaluate(windows : pandas.DataFrame, groupby, hyperparameters,
+    random_state=1, n_splits=5, label_column='activity'):
 
     # Setup subject-based cross validation
     splitter = GroupShuffleSplit(n_splits=n_splits, test_size=0.25, random_state=random_state)
-
-    # Spaces to search for hyperparameters
-    hyperparameters = {
-        'n_estimators': [ 10 ],
-        "max_features": [ 0.30 ],
-        'min_samples_leaf': [ 2**n for n in range(0, 10) ],
-    }
 
     clf = RandomForestClassifier(random_state = random_state, n_jobs=1, class_weight = "balanced")
 
@@ -64,8 +62,9 @@ def evaluate(windows : pandas.DataFrame, groupby, random_state=1, n_splits=5, la
     search.fit(X, Y, groups=groups)
 
     results = pandas.DataFrame(search.cv_results_)
+    estimator = search.best_estimator_
 
-    return results
+    return results, estimator
 
 
 def extract_windows(sensordata : pandas.DataFrame,
@@ -166,7 +165,7 @@ def extract_features(sensordata : pandas.DataFrame,
     out = pandas.concat(features)
     return out
     
-def run_pipeline(run, dataset, data_dir, out_dir):
+def run_pipeline(run, hyperparameters, dataset, data_dir, out_dir, n_splits=5):
 
     dataset_config = {
         'uci_har': dict(
@@ -235,7 +234,16 @@ def run_pipeline(run, dataset, data_dir, out_dir):
     print('Class distribution\n', features['activity'].value_counts(dropna=False))
 
     # Run train-evaluate
-    results = evaluate(features, groupby='subject')
+    results, estimator = evaluate(features,
+        hyperparameters=hyperparameters,
+        groupby='subject',
+        n_splits=n_splits,
+    )
+
+    estimator_path = os.path.join(out_dir, f'r_{run}_{dataset}.estimator.pickle')
+    with open(estimator_path, 'wb') as f:
+        pickle.dump(estimator, file=f)
+
 
     # Save results
     results['dataset'] = dataset
@@ -274,10 +282,21 @@ def main():
 
     run_id = uuid.uuid4().hex.upper()[0:6]
 
+    min_samples_leaf = config_number_list('MIN_SAMPLES_LEAF', '1,4,16,64,256')
+    trees = config_number_list('TREES', '10')
+
+    hyperparameters = {
+        "max_features": [ 0.30 ],
+        'n_estimators': trees,
+        'min_samples_leaf': min_samples_leaf,
+    }
+
     results = run_pipeline(dataset=args.dataset,
         out_dir=args.out_dir,
         data_dir=args.data_dir,
         run=run_id,
+        hyperparameters=hyperparameters,
+        n_splits=int(os.environ.get('FOLDS', '5')),
     )
 
     df = results.rename(columns=lambda c: c.replace('param_', ''))

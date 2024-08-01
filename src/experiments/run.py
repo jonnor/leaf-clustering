@@ -18,6 +18,7 @@ import scipy.special
 
 from ..utils.parallel import ProgressParallel, joblib
 from . import metrics
+from ..utils.config import config_number_list
 
 from emlearn.preprocessing.quantizer import Quantizer
 import emlearn
@@ -328,19 +329,6 @@ def run_datasets(pipeline, out_dir, run_id, quantizer=None, kvs={}, dataset_dir=
         log.info('dataset-run-end', dataset=dataset_id, dataset_no=no, **kvs)
         print(score)
 
-def autoparse_number(s):
-    if '.' in s:
-        return float(s)
-    else:
-        return int(s)
-
-def config_number_list(var : str, default : str, delim=',') -> list[int]:
-
-    s = os.environ.get(var, default)
-    tok = s.split(delim)
-    values = [ autoparse_number(v.strip()) for v in tok if v.strip() ] 
-
-    return values
 
 def get_depth_limiter():
 
