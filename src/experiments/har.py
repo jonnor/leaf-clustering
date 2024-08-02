@@ -13,7 +13,8 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import f1_score, make_scorer
 from sklearn.model_selection import GridSearchCV, GroupShuffleSplit
 
-from emlearn.evaluate.trees import model_size_bytes
+from emlearn.preprocessing.quantizer import Quantizer
+#from sklearn.preprocessing import LabelEncoder
 
 from ..features.quant import Quant
 from ..features.time_based import calculate_features as calculate_time_features
@@ -174,6 +175,10 @@ def extract_features(sensordata : pandas.DataFrame,
 
         # Extract features
         df = feature_extractor(windows)
+
+        # Convert features to 16-bit integers
+        quant = Quantizer().fit_transform(df.values)
+        df.loc[:,:] = quant
 
         # Attach labels
         df[label_column] = [ assign_window_label(w[label_column]) for w in windows ]
