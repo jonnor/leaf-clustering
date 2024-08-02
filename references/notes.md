@@ -2,10 +2,8 @@
 ## TODO
 
 - Analysis. Include just-quantization in comparison. At least 8 bits
-- Experiments. Run for all depth optimization strategies. Verify showing same tendencies.
-- Setup full evaluation pipeline for HAR
-- Setup model export and microcontroller firmware
-- Maybe try QUANT for feature engineering
+- Setup microcontroller firmware
+- Run framework comparisons on microcontrollers
 - Investigate hyperparameter for controlling leaf clustering
 
 Rename the experiments. hard, soft-f32, soft-u8, cluster-u8, soft-u4, cluster-u4 ?
@@ -145,6 +143,29 @@ Compare in terms of size and inference time.
 
 On HAR datasets.
 
+#### How does code generation vs data structure compare
+In terms of program size and inference time
+
+Hypothesis: datastructure "loadable" is smaller in size, but slower in inference time
+
+! On Linux x64 over 10x speedup was seen, with -O3
+
+Using n a 10 tree model on UCI HAR with timebased features.
+Running 60*1000 iterations.
+MicroMLGen, which also uses an "inline" strategy also does well.
+```
+METHOD              TIME[us]
+emlearn inline           800
+micromlgen              1500
+emlearn loadable       10500
+m2cgen                 10000
+```
+
+Is this the case also on microcontrollers?
+
+Initial thoughts: Maybe out of scope?
+Inference time is so fast that it does not really matter.
+But this result is cause for reconsideration.
 
 
 ## Answered
@@ -165,12 +186,7 @@ Majority under 100kB. OK.
 
 To keep the paper focused. Candidates for "future work".
 
-#### How does code generation vs data structure compare, wrt size and inference time
 
-Hypothesis: datastructure "loadable" is smaller in size, but slower in inference time
-
-Reason for out of scope.
-Inference time is so fast that it does not really matter
 
 #### What are limitating factors for practical models on microcontrollers
 Hypothesis 1: Model size is the primary bottleneck/constraint over inference time.

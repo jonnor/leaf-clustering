@@ -20,10 +20,11 @@ def export_emlearn(estimator, name, inference='loadable', dtype='int16_t', **kwa
     code = c.save(name='model', inference=inference)    
 
     model_name = name
-    code += f"""\n
-    int {model_name}_predict(const {dtype} *f, int l) {{
-        return eml_trees_predict(&{model_name}, f, l);
-    }}"""
+    if inference == 'loadable':
+        code += f"""\n
+        int {model_name}_predict(const {dtype} *f, int l) {{
+            return eml_trees_predict(&{model_name}, f, l);
+        }}"""
 
     return code
 
