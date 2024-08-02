@@ -116,11 +116,39 @@ def assign_window_label(labels, majority=0.66):
     else:
         return None
 
-def extract_features_quant(sensordata : pandas.DataFrame,
+def quant_features(windows, columns, div, depth, window_length):
+
+    import torch
+    transform = Quant(div=div, depth=depth)
+
+    f = []
+    for c in columns:
+
+        values = numpy.stack([w[c] for w in windows]).astype(numpy.float32)
+        tensor = torch.from_numpy(values).reshape(len(values),1,window_length)
+        X = transform.fit_transform(tensor, Y=None)
+        f.append(X)
+
+    ff = numpy.concatenate(f, axis=-1)
+    # TODO: add names to features
+    df = pandas.DataFrame(ff)
+
+    return df
+
+def timebased_features(windows, columns):
+
+    # Extract features
+    f = [ calculate_time_features(w[columns].values).iloc[0] for w in windows ]
+    df = pandas.DataFrame(f)
+
+    return df
+
+def extract_features(sensordata : pandas.DataFrame,
     columns : list[str],
     groupby,
     window_length = 128,
     window_hop = 64,
+    features='quant',
     quant_div = 4,
     quant_depth = 6,
     label_column='activity',
@@ -129,61 +157,15 @@ def extract_features_quant(sensordata : pandas.DataFrame,
     Convert sensor data into fixed-sized time windows and extact features
     """
 
-    import torch
-
-    transform = Quant(div=quant_div, depth=quant_depth)
-
-    features = []
-
-    # Split into fixed-length windows
-    generator = extract_windows(sensordata, window_length, window_hop, groupby=groupby)
-    for windows in generator:
-    
-        # Extract features
-        f = []
-        for c in columns:
-
-            values = numpy.stack([w[c] for w in windows]).astype(numpy.float32)
-            tensor = torch.from_numpy(values).reshape(len(values),1,window_length)
-            X = transform.fit_transform(tensor, Y=None)
-            f.append(X)
-
-        ff = numpy.concatenate(f, axis=-1)
-        # TODO: add names to features
-        df = pandas.DataFrame(ff)
-
-        # Attach labels
-        df[label_column] = [ assign_window_label(w[label_column]) for w in windows ]
-
-        # Combine with identifying information
-        index_columns = list(groupby + ['window'])
-        for idx_column in index_columns:
-            df[idx_column] = [w[idx_column].iloc[0] for w in windows]
-        df = df.set_index(index_columns)
-
-        features.append(df)
-
-    out = pandas.concat(features)
-    return out
-    
-
-
-def extract_features(sensordata : pandas.DataFrame,
-    columns : list[str],
-    groupby,
-    window_length = 128,
-    window_hop = 64,
-    label_column='activity',
-    ) -> pandas.DataFrame:
-    """
-    Convert sensor data into fixed-sized time windows and extact features
-    """
-
-    features = []
-
-    assert len(columns) == 3, columns # expectes tri-axial data
+    if features == 'quant':
+        feature_extractor = lambda w: quant_features(w, columns, quant_div, quant_depth, window_length)
+    elif features == 'timebased':
+        feature_extractor = lambda w: timebased_features(w, columns=columns)
+    else:
+        raise ValueError(f"Unsupported features: {features}")
 
     # Split into fixed-length windows
+    features_values = []
     generator = extract_windows(sensordata, window_length, window_hop, groupby=groupby)
     for windows in generator:
     
@@ -191,8 +173,7 @@ def extract_features(sensordata : pandas.DataFrame,
         windows = [ w for w in windows if not w[columns].isnull().values.any() ]
 
         # Extract features
-        f = [ calculate_time_features(w[columns].values).iloc[0] for w in windows ]
-        df = pandas.DataFrame(f)
+        df = feature_extractor(windows)
 
         # Attach labels
         df[label_column] = [ assign_window_label(w[label_column]) for w in windows ]
@@ -203,13 +184,19 @@ def extract_features(sensordata : pandas.DataFrame,
             df[idx_column] = [w[idx_column].iloc[0] for w in windows]
         df = df.set_index(index_columns)
 
-        features.append(df)
+        features_values.append(df)
 
-    out = pandas.concat(features)
+    out = pandas.concat(features_values)
     return out
 
 
-def run_pipeline(run, hyperparameters, dataset, data_dir, out_dir, n_splits=5):
+
+def run_pipeline(run, hyperparameters, dataset,
+        data_dir,
+        out_dir,
+        n_splits=5,
+        features='quant',
+    ):
 
     dataset_config = {
         'uci_har': dict(
@@ -258,7 +245,7 @@ def run_pipeline(run, hyperparameters, dataset, data_dir, out_dir, n_splits=5):
     log.info('data-loaded', dataset=dataset, samples=len(data), duration=data_load_duration)
 
     feature_extraction_start = time.time()
-    features = extract_features(data, columns=data_columns, groupby=groups)
+    features = extract_features(data, columns=data_columns, groupby=groups, features=features)
     labeled = numpy.count_nonzero(features['activity'].notna())
 
     feature_extraction_duration = time.time() - feature_extraction_start
@@ -302,15 +289,15 @@ def parse():
     import argparse
     parser = argparse.ArgumentParser(description='')
 
-    parser.add_argument('--out', metavar='FILE', type=str, default='',
-                        help='Where to put results')
-
     parser.add_argument('--dataset', type=str, default='uci_har',
                         help='Which dataset to use')
     parser.add_argument('--data-dir', metavar='DIRECTORY', type=str, default='./data/processed',
                         help='Where the input data is stored')
     parser.add_argument('--out-dir', metavar='DIRECTORY', type=str, default='./output/results/har',
                         help='Where to store results')
+
+    parser.add_argument('--features', type=str, default='quant',
+                        help='Which feature-set to use')
 
     args = parser.parse_args()
 
@@ -341,6 +328,7 @@ def main():
         run=run_id,
         hyperparameters=hyperparameters,
         n_splits=int(os.environ.get('FOLDS', '5')),
+        features=args.features,
     )
 
     df = results.rename(columns=lambda c: c.replace('param_', ''))
