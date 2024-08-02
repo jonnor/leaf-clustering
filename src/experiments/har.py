@@ -271,10 +271,17 @@ def run_pipeline(run, hyperparameters, dataset,
         n_splits=n_splits,
     )
 
+    # Save a model
     estimator_path = os.path.join(out_dir, f'r_{run}_{dataset}.estimator.pickle')
     with open(estimator_path, 'wb') as f:
         pickle.dump(estimator, file=f)
 
+    # Save testdata
+    label_column = 'activity'
+    testdata_path = os.path.join(out_dir, f'r_{run}_{dataset}.testdata.npz')
+    testdata = features.groupby(label_column, as_index=False).sample(n=10)
+    feature_columns = sorted(set(testdata.columns) - set([label_column]))
+    numpy.savez(testdata_path, X=testdata[feature_columns], Y=testdata[label_column])
 
     # Save results
     results['dataset'] = dataset
