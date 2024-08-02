@@ -16,6 +16,7 @@ from sklearn.model_selection import GridSearchCV, GroupShuffleSplit
 from emlearn.evaluate.trees import model_size_bytes
 
 from ..features.quant import Quant
+from ..features.time_based import calculate_features as calculate_time_features
 from ..experiments import metrics
 from ..utils.config import config_number_list
 
@@ -115,7 +116,7 @@ def assign_window_label(labels, majority=0.66):
     else:
         return None
 
-def extract_features(sensordata : pandas.DataFrame,
+def extract_features_quant(sensordata : pandas.DataFrame,
     columns : list[str],
     groupby,
     window_length = 128,
@@ -123,7 +124,7 @@ def extract_features(sensordata : pandas.DataFrame,
     quant_div = 4,
     quant_depth = 6,
     label_column='activity',
-    ):
+    ) -> pandas.DataFrame:
     """
     Convert sensor data into fixed-sized time windows and extact features
     """
@@ -165,6 +166,49 @@ def extract_features(sensordata : pandas.DataFrame,
     out = pandas.concat(features)
     return out
     
+
+
+def extract_features(sensordata : pandas.DataFrame,
+    columns : list[str],
+    groupby,
+    window_length = 128,
+    window_hop = 64,
+    label_column='activity',
+    ) -> pandas.DataFrame:
+    """
+    Convert sensor data into fixed-sized time windows and extact features
+    """
+
+    features = []
+
+    assert len(columns) == 3, columns # expectes tri-axial data
+
+    # Split into fixed-length windows
+    generator = extract_windows(sensordata, window_length, window_hop, groupby=groupby)
+    for windows in generator:
+    
+        # drop invalid data
+        windows = [ w for w in windows if not w[columns].isnull().values.any() ]
+
+        # Extract features
+        f = [ calculate_time_features(w[columns].values).iloc[0] for w in windows ]
+        df = pandas.DataFrame(f)
+
+        # Attach labels
+        df[label_column] = [ assign_window_label(w[label_column]) for w in windows ]
+
+        # Combine with identifying information
+        index_columns = list(groupby + ['window'])
+        for idx_column in index_columns:
+            df[idx_column] = [w[idx_column].iloc[0] for w in windows]
+        df = df.set_index(index_columns)
+
+        features.append(df)
+
+    out = pandas.concat(features)
+    return out
+
+
 def run_pipeline(run, hyperparameters, dataset, data_dir, out_dir, n_splits=5):
 
     dataset_config = {
