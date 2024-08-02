@@ -3,12 +3,24 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "model_none.h"
-#include "model_m2cgen.h"
+// For eml_benchmark_micros(), used for timing
+#include <eml_benchmark.h>
 
+// Defines model_predict()
+#if defined(MODEL_NONE)
+    #include "model_none.h"
+#elif defined(MODEL_M2CGEN)
+    #include "model_m2cgen.h"
+#elif defined(MODEL_EMLEARN)
+    #include "model_emlearn.h"
+#elif defined(MODEL_MICROMLGEN)
+    #include "model_micromlgen.h"
+#else
+    #error "No model defined"
+#endif
+
+// Defines testdata_samples, _features, _values, _labels
 #include "testdata.h"
-
-// model_predict() should be defined by one of the includes
 
 
 int run_tests() {
@@ -16,9 +28,9 @@ int run_tests() {
     const int samples = testdata_samples;
     const int features_length = testdata_features;
 
-    const int repeats = 2;
+    const int repeats = 1000;
 
-    const long int time = 0;
+    const int64_t start_time = eml_benchmark_micros();
 
     int errors = 0;
     int tests = 0;
@@ -39,10 +51,13 @@ int run_tests() {
     }
     errors = errors / repeats;
     tests = tests / repeats;
+    const int64_t time_us = eml_benchmark_micros() - start_time;
 
-    printf("test-complete samples=%d time=%d errors=%d \n",
-        tests, time, errors
+    printf("test-complete samples=%d time=%ld errors=%d \n",
+        tests, (long)time_us, errors
     );
+
+    return errors;
 }
 
 
