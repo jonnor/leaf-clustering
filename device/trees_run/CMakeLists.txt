@@ -4,7 +4,7 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(emlearn_hello_world)
 
 include_directories(../../src/experiments/ ../code)
-add_definitions(-DMODEL_EMLEARN)
+add_definitions(-DMODEL_M2CGEN)
 
 file(GLOB app_sources src/*)
 target_sources(app PRIVATE ${app_sources})

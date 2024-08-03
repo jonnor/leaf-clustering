@@ -20,7 +20,7 @@ int main(void)
 
     /* Check if USB can be initialised, bails out if fail is returned */
 	if (usb_enable(NULL) != 0) {
-		return;
+		return 1;
 	}
 
 	/* Wait for a console connection, if the DTR flag was set to activate USB */
