@@ -1,5 +1,8 @@
 
+//#if defined(MODEL_MICROMLGEN)
+//#else
 #include "runtests.c"
+//#endif
 
 #include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>

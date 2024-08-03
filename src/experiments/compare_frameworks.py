@@ -68,8 +68,16 @@ def export_micromlgen(estimator, name, **kwargs):
 
     code = micromlgen.port(estimator)
 
+    # Convert to plain C, by stripping the surrounding C++ class
+    start = 'int predict'
+    end = 'protected:'
+    
+    start_index = code.index(start)
+    end_index = code.index(end)
+    code = code[start_index:end_index]
+
     code += f'''\n
-    extern "C" {{
+    //extern "C" {{
 
     int {name}_predict(const int16_t *features, int length) {{
 
@@ -78,13 +86,12 @@ def export_micromlgen(estimator, name, **kwargs):
             conv[i] = features[i];
         }}
 
-        Eloquent::ML::Port::RandomForest forest;
-        const int out = forest.predict(conv);
+        const int out = predict(conv);
 
         return out;
     }}
 
-    }}
+    //}}
     '''
 
     return code
