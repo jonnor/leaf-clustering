@@ -138,6 +138,20 @@ def quant_features(windows, columns, div, depth, window_length):
 
 def timebased_features(windows, columns):
 
+    print("timebased save")
+    path = 'windows.npy'
+    windows = numpy.stack([w[columns].values for w in windows[0:10]])
+
+    # scale from 1.0 == 1g to 16g range in int16
+    SCALING_FACTOR = 32768 // 16
+    MAX_VAL = 32768-1
+    MIN_VAL = -32768
+    windows = numpy.clip(windows * SCALING_FACTOR, MIN_VAL, MAX_VAL).astype(numpy.int16)
+
+    print('w', windows.shape, windows.dtype)
+    numpy.save(path, windows, allow_pickle=False)
+    print('Saved', path, windows.shape, windows[0].shape)
+
     # Extract features
     f = [ calculate_time_features(w[columns].values).iloc[0] for w in windows ]
     df = pandas.DataFrame(f)
@@ -149,7 +163,7 @@ def extract_features(sensordata : pandas.DataFrame,
     groupby,
     window_length = 128,
     window_hop = 64,
-    features='quant',
+    features='timebased',
     quant_div = 4,
     quant_depth = 6,
     label_column='activity',
@@ -157,7 +171,8 @@ def extract_features(sensordata : pandas.DataFrame,
     """
     Convert sensor data into fixed-sized time windows and extact features
     """
-
+    
+    features = 'timebased'
     if features == 'quant':
         feature_extractor = lambda w: quant_features(w, columns, quant_div, quant_depth, window_length)
     elif features == 'timebased':
