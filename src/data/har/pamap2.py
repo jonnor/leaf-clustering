@@ -13,7 +13,7 @@ import shutil
 
 import pandas
 
-from src.utils.download import download_unpack_zip
+from ...utils.download import download_unpack_zip
 
 
 def assert_data_correct(data):

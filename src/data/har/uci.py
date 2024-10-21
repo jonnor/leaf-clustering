@@ -16,7 +16,7 @@ import glob
 import pandas
 import numpy
 
-from src.utils.download import download_unpack_zip
+from ...utils.download import download_unpack_zip
 
 def assert_data_correct(data):
 
