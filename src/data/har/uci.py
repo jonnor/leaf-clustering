@@ -158,10 +158,21 @@ def load_packed(packed_path):
 
     return loaded
 
+def parse():
+    import argparse
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--download', default='data/raw/uci_har_smartphone/')
+    parser.add_argument('--pack', default='data/processed/uci_har.parquet')
+
+    args = parser.parse_args()
+    return args
+
 def main():
 
-    dataset_path = 'data/raw/uci_har_smartphone/'
-    packed_path = 'data/processed/uci_har.parquet'
+    args = parse()
+    dataset_path = args.download
+    packed_path = args.pack
 
     downloaded = download(dataset_path)
     data = load_data(dataset_path)

@@ -186,10 +186,21 @@ def download(out_path, force=False):
     assert os.path.exists(check_path), os.listdir(out_path)
     return True
 
+def parse():
+    import argparse
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--download', default='data/raw/pamap2/')
+    parser.add_argument('--pack', default='data/processed/pamap2.parquet')
+
+    args = parser.parse_args()
+    return args
+
 def main():
 
-    dataset_path = 'data/raw/pamap2/'
-    packed_path = 'data/processed/pamap2.parquet'
+    args = parse()
+    dataset_path = args.download
+    packed_path = args.pack
 
     downloaded = download(dataset_path)
     data = load_data(dataset_path)
