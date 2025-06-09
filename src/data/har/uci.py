@@ -145,7 +145,7 @@ def download(out_path=None, force=False):
         # already exists
         return False    
 
-    download_url = 'https://www.archive.ics.uci.edu/static/public/341/smartphone+based+recognition+of+human+activities+and+postural+transitions.zip'
+    download_url = 'https://archive.ics.uci.edu/static/public/341/smartphone+based+recognition+of+human+activities+and+postural+transitions.zip'
 
     print('Downloading dataset to', out_path)
     download_unpack_zip(download_url, out_path)
