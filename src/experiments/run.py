@@ -382,11 +382,11 @@ def main():
 
     # Leaf clustering, with or without quantization
     cluster_quantizers = [None, 0, 4, 8]
-    clusters = [ None, 1, 2, 4, 8, 16, 32 ]
+    clusters = [ 1, 2, 4, 8, 16, 32 ] # XXX: None is skipped, since it comes after
     optimizers = [ {'quantize': q, 'cluster': c} for q in cluster_quantizers for c in clusters ]
 
     # Leaf quantization only, no clustering
-    quantizers = [ 0, 1, 2, 3, 4, 5, 6, 7, 8 ]
+    quantizers = [ None, 0, 1, 2, 3, 4, 5, 6, 7, 8 ]
     optimizers += [ {'quantize': q, 'cluster': None} for q in quantizers ]
 
     log.info('experiments-ready',
