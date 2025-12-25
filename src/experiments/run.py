@@ -81,6 +81,16 @@ def optimize(estimator, n_samples, n_classes, leaf_quantization=None, leaves_per
     assert leaves.shape[1] == 1, 'only single output supported'
     leaves = numpy.squeeze(leaves)
 
+    # Replace predict with function that handles quantized values,
+    # and still gives valid probabilities as output
+    # Otherwise get ValueError: Target scores need to be probabilities for multiclass roc_auc, i.e. they should sum up to 1.0 over classes
+    original_predict_proba = estimator.predict_proba
+    def predict_proba(est, X):
+        orig = original_predict_proba(X)
+        proba = scipy.special.softmax(orig, axis=1)
+        return proba
+    estimator.predict_proba = lambda X: predict_proba(estimator, X)
+
     # Quantize leaves
     n_unique_leaves_quantized = None
     if leaf_quantization is not None:
@@ -107,10 +117,7 @@ def optimize(estimator, n_samples, n_classes, leaf_quantization=None, leaves_per
             for i in range(len(e.tree_.value)):
                 is_leaf = (e.tree_.children_left[i] == -1) and (e.tree_.children_right[i] == -1)
                 if is_leaf:
-                    # make sure probabilities still sum to 1.0
-                    q = scipy.special.softmax(quantized[i])
-                    #print('qq', q.shape, numpy.sum(q))
-                    e.tree_.value[i] = q
+                    e.tree_.value[i] = quantized[i]
 
         leaves = get_leaves(estimator)
         assert leaves.shape[1] == 1, 'only single output supported'
