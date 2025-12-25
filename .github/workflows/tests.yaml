@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.10']
+        python-version: ['3.12']
 
     steps:
       - uses: actions/checkout@v4
@@ -37,7 +37,7 @@ jobs:
   har:
     runs-on: ubuntu-latest
     env:
-      python-version: '3.10'
+      python-version: '3.12'
       TREES: 10
       MIN_SAMPLES_LEAF: 1,8,64
     strategy:
@@ -88,7 +88,7 @@ jobs:
     if: contains(github.ref, 'experiments')
     runs-on: ubuntu-latest
     env:
-      python-version: '3.10'
+      python-version: '3.12'
     strategy:
       matrix:
         depth_limiter: [
