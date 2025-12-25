@@ -1,9 +1,13 @@
 
 import seaborn
 import pandas
+import structlog
 
 import uuid
 import math
+from pathlib import Path
+
+log = structlog.get_logger()
 
 def plot_leaf_quantization(df, path):
 
@@ -13,7 +17,7 @@ def plot_leaf_quantization(df, path):
 
     # Extract change in performance wrt no change
     def rel_perf(df, metric='test_roc_auc'):
-        matches = df[df.leaf_bits.isna()]
+        matches = df[df.leaves_per_class.isna() & df.leaf_bits.isna() & (df.min_samples_leaf == 1)]
         assert len(matches) == 1, matches
         ref = matches.iloc[0][metric]
         out = df[metric] - ref
@@ -52,7 +56,7 @@ def plot_leaf_clustering(df, path):
     
     # Extract change in performance
     def rel_perf(df, metric='test_roc_auc'):
-        matches = df[df.leaves_per_class.isna()]
+        matches = df[df.leaves_per_class.isna() & df.leaf_bits.isna() & (df.min_samples_leaf == 1)]
         assert len(matches) == 1, matches
         ref = matches.iloc[0][metric]
         out = df[metric] - ref
@@ -100,14 +104,14 @@ def plot_perf_vs_size(df, path):
 
     # Extract change in performance
     def subtract_ref(df, metric='test_roc_auc'):
-        matches = df[df.leaves_per_class.isna() & df.leaf_bits.isna()]
+        matches = df[df.leaves_per_class.isna() & df.leaf_bits.isna() & (df.min_samples_leaf == 1)]
         assert len(matches) == 1, matches
         ref = matches.iloc[0][metric]
         out = df[metric] - ref
         return out
 
     def divide_ref(df, metric='test_roc_auc'):
-        matches = df[df.leaves_per_class.isna() & df.leaf_bits.isna()]
+        matches = df[df.leaves_per_class.isna() & df.leaf_bits.isna() & (df.min_samples_leaf == 1)]
         assert len(matches) == 1, matches
         ref = matches.iloc[0][metric]
         out = df[metric] / ref
@@ -139,21 +143,21 @@ def plot_perf_vs_size(df, path):
 
 
 
-def plot_size_improvement(df, path):
+def plot_size_improvement(df, path, optimizer_param='leaves_per_class'):
 
     # Filter data
     pass
 
     # Extract change in performance
     def subtract_ref(df, metric='test_roc_auc'):
-        matches = df[df.leaves_per_class.isna() & df.leaf_bits.isna()]
+        matches = df[df.leaves_per_class.isna() & df.leaf_bits.isna() & (df.min_samples_leaf == 1)]
         assert len(matches) == 1, matches
         ref = matches.iloc[0][metric]
         out = df[metric] - ref
         return out
 
     def divide_ref(df, metric='test_roc_auc'):
-        matches = df[df.leaves_per_class.isna() & df.leaf_bits.isna()]
+        matches = df[df.leaves_per_class.isna() & df.leaf_bits.isna() & (df.min_samples_leaf == 1)]
         assert len(matches) == 1, matches
         ref = matches.iloc[0][metric]
         out = df[metric] / ref
@@ -166,16 +170,16 @@ def plot_size_improvement(df, path):
     df = name_strategies(df)
 
 
-    df = df[df.strategy == 'joint']
+    #df = df[df.strategy == 'joint']
     df = df[df.leaf_bits == 8]
-    df = df[df.perf_change >= -1.0]
+    #df = df[df.perf_change >= -1.0]
 
     #df.groupby(['dataset', ''])
 
     # make categorical
-    df['leaves_per_class'] = df['leaves_per_class'].astype('Int64').astype(str)
+    df[optimizer_param] = df[optimizer_param].astype('Int64').astype(str)
 
-    best = df.groupby(['dataset', 'leaves_per_class'], dropna=False).median(numeric_only=True).reset_index()
+    best = df.groupby(['dataset', optimizer_param], dropna=False).median(numeric_only=True).reset_index()
 
     def find_best(df):
         s = df.sort_values('size_change', ascending=True)
@@ -187,7 +191,9 @@ def plot_size_improvement(df, path):
 
     # Plot results
     g = seaborn.relplot(data=best, kind='scatter',
-        x='size_change', y='perf_change', hue='leaves_per_class',
+        x='size_change',
+        y='perf_change',
+        hue=optimizer_param,
         height=6, aspect=2.0, #s=5.0,
     )
     g.refline(y=0.0)
@@ -227,10 +233,46 @@ def enrich_results(df,
 
     return df
 
+def comma_separated(s, delimiter=','):
+    tok = s.split(delimiter)
+    return tok
+
+ALL_PLOTS=[
+    'size_improvement',
+    'perf_vs_size',
+    'leaf_quantization',
+    'leaf_clustering',
+]
+
+def parse():
+    import argparse
+    parser = argparse.ArgumentParser(description='')
+
+    parser.add_argument('--results', metavar='DIRECTORY', type=str, default='./output/results/experiments.parquet',
+                        help='Where the input data is stored')
+
+    # FIXME: change default to reports/figures
+    parser.add_argument('--out-dir', metavar='DIRECTORY', type=str, default='./',
+                        help='Where to store figures')
+
+    parser.add_argument('--plots', type=comma_separated, default=ALL_PLOTS,
+                        help='Which plots to make')
+
+    args = parser.parse_args()
+
+    return args
+
+
 def main():
+    args = parse()
+
+    # Check inputs
+    invalid_plots = set(args.plots) - set(ALL_PLOTS)
+    if invalid_plots:
+        raise ValueError(f'Unknown plots {invalid_plots}')
 
     # Load data
-    df = pandas.read_parquet('out.parquet')
+    df = pandas.read_parquet(args.results)
 
     print(df.shape)
     print(list(sorted(df.columns)))
@@ -241,23 +283,31 @@ def main():
 
 
     print(df.experiment.value_counts())
-
     print(df.run.value_counts())
-
-
-
     print(df.leaves_per_class.unique())
     print(df.leaf_bits.unique())
 
 
-    plot_size_improvement(df, path='size-improvement.png')
+    out_dir = Path(args.out_dir)
 
-    #plot_perf_vs_size(df, path='size-change.png')
+    # FIXME: have a better way of marking the baseline to compare with
+    if 'size_improvement' in args.plots:
+        plot_size_improvement(df,
+            path=out_dir/'size-improvement.png',
+            optimizer_param='leaf_bits',
+        )
 
-    #plot_leaf_quantization(df, path='leaf-quantization.png')
+    if 'perf_vs_size' in args.plots:
+        plot_perf_vs_size(df, path=out_dir/'size-change.png')
 
-    #plot_leaf_clustering(df, path='leaf-clustering.png')
+    if 'leaf_quantization' in args.plots:
+        plot_leaf_quantization(df, path=out_dir /'leaf-quantization.png')
 
+    if 'leaf_clustering' in args.plots:
+        plot_leaf_clustering(df, path=out_dir/'leaf-clustering.png')
+
+
+    log.debug('analyze-plots-done', out=out_dir)
 
 
 
