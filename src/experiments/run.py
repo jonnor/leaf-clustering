@@ -380,15 +380,9 @@ def main():
     for k, v in experiments.items():
         print(k, v)
 
-    sub = 'quantization'
-    if sub == 'clustering':
-        quantizers = [None, 0, 4, 8, 16]
-        clusters = [ None, 1, 2, 4, 8, 16, 32 ]
-    elif sub == 'quantization':
-        quantizers = [None, 0, 1, 2, 3, 4, 5, 6, 7, 8, 16]
-        clusters = [ None ]
-    else:
-        raise ValueError(f'Unknown sub experiment {sub}')
+    
+    quantizers = [None, 0, 1, 2, 3, 4, 5, 6, 7, 8, 16]
+    clusters = [ None, 1, 2, 4, 6, 8, 12, 16, 24, 32 ]
 
     optimizers = [ {'quantize': q, 'cluster': c} for q in quantizers for c in clusters ]
 
