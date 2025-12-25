@@ -1,16 +1,63 @@
 
 ## TODO
 
-- Analysis. Include just-quantization in comparison. At least 8 bits
-- Setup microcontroller firmware
+- Re-run plots in notebooks with latest results
+- Move plotting code from notebooks to scripts
+- Add plotting code to a Actions step
+- Change or add HAR training script to output multiple models
+- Make script to automate the device test runs.
+Run X models, X frameworks, on 1 microcontrollers
+Generate X different models, of different sizes and for both datasets
 - Run framework comparisons on microcontrollers
 - Investigate hyperparameter for controlling leaf clustering
 
+Split out emlearn inline plus loadable?
+? try to place loadable in
+
+Maybe change to 256 window size on PAMAP2
+
 Rename the experiments. hard, soft-f32, soft-u8, cluster-u8, soft-u4, cluster-u4 ?
+
+
+## Claims
+
+#### int16 feature is virtually lossless
+Minor. Just a stepping-stone for the next parts.
+
+#### Majority voting can result in signficant performance drop
+Demonstrates the problem / potential for improvement.
+
+#### Leaf proportions with low-bits quantization (OR clustering) dominates
+Pareto optimial wrt A) hard majority voting and B) full float leaf proportions.
+When condidering predictive performance and model size.
+Assuming that leaf-deduplication is enabled.
+! need to show that there is no majority model with more nodes/trees that
+performs better, at same or smaller model size.
+On majority of the datasets. Ideally all.
+
+? Enough to show this at a single set of trees. Ex=10
+
+#### emlearn (with leaf quant/cluster) dominates
+When considering predictive performance and model size.
+Ideally also inference time.
+When running on microcontroller.
+
+Show on a few datasets.
 
 ## Open questions
 
 
+#### On device performance
+
+PYTHONPATH=.. python -m src.experiments.compare_frameworks ../output/results/har/r_6A1CF5_uci_har.estimator.pickle
+west build -p=always -b rpi_pico trees_run/
+
+TODO: use west flash?
+```
+openocd -f interface/cmsis-dap.cfg -c 'transport select swd' -f target/rp2040.cfg -c "adapter speed 2000" -c 'targets rp2040.core0'
+```
+Script to catch build size output
+Python script to catch USB serial output
 
 
 #### What differences are there between soft and hard voting
@@ -43,6 +90,7 @@ From a few up to 250.
 #### How well does feature quantization work
 
 Hypothesis: 16 bit feature is ~lossless.
+Result: Seems to be the case.
 
 Results when running separate training runs indicate that 16 bit features is indeed lossless
 Was within the margins of error for experiment (rather large because of random differences).
@@ -54,7 +102,7 @@ Then apply feature quantization for test set only.
 #### How well does leaf quantization work
 
 Hypothesis: A 8 bit leaf probabilities is ~lossless
-Seems to be the case.
+Result: Seems to be the case.
 
 Not needed to analyze separately from clustering?
 Seems that most of the gains in model size comes from the 32bit->8bit storage for leaf values.
@@ -163,9 +211,97 @@ m2cgen                 10000
 
 Is this the case also on microcontrollers?
 
+RP2040, with Zephyr
+```
+emlearn loadable
+test-complete repeats=100 samples=60 time=372800 errors=2 
+
+emlearn inline
+test-complete repeats=100 samples=60 time=2100 errors=2 
+test-complete repeats=100 samples=60 time=2000 errors=2 
+
+m2cgen
+test-complete repeats=1 samples=60 time=31900 errors=3
+test-complete repeats=100 samples=60 time=2026700 errors=3 
+
+micromlgen
+test-complete repeats=1 samples=60 time=9600 errors=3
+test-complete repeats=1 samples=60 time=9700 errors=3
+test-complete repeats=100 samples=60 time=9800 errors=3
+```
+
+? Was this emlearn loadable with float?
+Latest commit was maybe 6c45cc64d73de7cbf043cd11b49ef89b41c4f11c - 0.21.0
+But unsure if that was the test results.
+
+Even bigger difference between inline and lodable!
+Over 100x!!
+Is it the difference between external FLASH and code mem?
+Could try to use non-const memory instead to place into RAM
+
 Initial thoughts: Maybe out of scope?
 Inference time is so fast that it does not really matter.
 But this result is cause for reconsideration.
+
+
+### m2cgen compile failure
+
+
+/home/jon/projects/tiny-random-forests/device/trees_run/../code/model_m2cgen.h:5343:115: error: macro "memcpy" passed 8 arguments, but takes just 3
+ 5343 |                                         memcpy(var19, (double[]){0.0, 0.0, 0.0, 0.0, 1.0, 0.0}, 6 * sizeof(double));
+      |                                                                                                                   ^
+/data/emlearn/zephyr-sdk-0.16.5/arm-zephyr-eabi/picolibc/include/ssp/string.h:97: note: macro "memcpy" defined here
+   97 | #define memcpy(dst, src, len) __ssp_bos_check3(memcpy, dst, src, len)
+
+Should add parens around the data declaration.
+
+https://github.com/BayesWitnesses/m2cgen/pull/593
+
+###
+
+arch_irq_unlock (key=0)
+    at /home/jon/projects/tiny-random-forests/device/zephyr/include/zephyr/arch/arm/asm_inline_gcc.h:102
+102		__asm__ volatile(
+(gdb) 
+0x1000c292	102		__asm__ volatile(
+(gdb) 
+
+
+Program stopped.
+0x1000c292 in arch_irq_unlock (key=0)
+    at /home/jon/projects/tiny-random-forests/device/zephyr/include/zephyr/arch/arm/asm_inline_gcc.h:102
+102		__asm__ volatile(
+(gdb) 
+[rp2040.core0] target not halted
+target rp2040.core0 was not halted when step was requested
+
+
+^C
+Program received signal SIGINT, Interrupt.
+arch_system_halt (reason=reason@entry=0)
+    at /home/jon/projects/tiny-random-forests/device/zephyr/kernel/fatal.c:32
+32		for (;;) {
+(gdb) bt
+#0  arch_system_halt (reason=reason@entry=0)
+    at /home/jon/projects/tiny-random-forests/device/zephyr/kernel/fatal.c:32
+#1  0x1000fbbe in k_sys_fatal_error_handler (reason=reason@entry=0, 
+    esf=esf@entry=0x20001f10 <z_interrupt_stacks+1992>)
+    at /home/jon/projects/tiny-random-forests/device/zephyr/kernel/fatal.c:46
+#2  0x1000d508 in z_fatal_error (reason=reason@entry=0, 
+    esf=esf@entry=0x20001f10 <z_interrupt_stacks+1992>)
+    at /home/jon/projects/tiny-random-forests/device/zephyr/kernel/fatal.c:122
+#3  0x1000f35c in z_arm_fatal_error (reason=reason@entry=0, 
+    esf=esf@entry=0x20001f10 <z_interrupt_stacks+1992>)
+    at /home/jon/projects/tiny-random-forests/device/zephyr/arch/arm/core/fatal.c:73
+#4  0x1000c1ae in z_arm_fault (msp=<optimized out>, psp=<optimized out>, 
+    exc_return=<optimized out>, callee_regs=<optimized out>)
+    at /home/jon/projects/tiny-random-forests/device/zephyr/arch/arm/core/cortex_m/fault.c:1157
+#5  0x1000c1e4 in z_arm_hard_fault ()
+    at /home/jon/projects/tiny-random-forests/device/zephyr/arch/arm/core/cortex_m/fault_s.S:102
+#6  <signal handler called>
+#7  0x00000000 in ?? ()
+Backtrace stopped: previous frame identical to this frame (corrupt stack?)
+(gdb) 
 
 
 ## Answered
