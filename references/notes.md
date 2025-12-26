@@ -4,6 +4,7 @@
 - Re-run plots in notebooks with latest results
 - Move plotting code from notebooks to scripts
 - Add plotting code to a Actions step
+- Put complete pareto frontier plots into Appendix 1
 - Change or add HAR training script to output multiple models
 - Make script to automate the device test runs.
 Run X models, X frameworks, on 1 microcontrollers
