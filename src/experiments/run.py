@@ -399,6 +399,7 @@ def main():
     trees = config_number_list('TREES', '100')
     experiment = os.environ.get('EXPERIMENT', 'tree-minsamplesleaf')
     feature_dtype = os.environ.get('FEATURE_DTYPE', None)
+    n_jobs = int(os.environ.get('PARALLEL_JOBS', '-1'))
 
     depth_limiter_metric, depth_limiter_values = get_depth_limiter()
 
@@ -461,7 +462,7 @@ def main():
         kvs['folds'] = folds
         kvs['repetitions'] = repetitions
 
-        run_datasets(p, quantizer=quantizer, optimizers=optimizers, kvs=kvs,
+        run_datasets(p, quantizer=quantizer, optimizers=optimizers, kvs=kvs, n_jobs=n_jobs,
             out_dir=out_dir, run_id=run_id, repetitions=repetitions, cv=folds)
 
 
