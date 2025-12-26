@@ -33,13 +33,14 @@ log = structlog.get_logger()
 
 
 
-def quantize_probabilities(p, bits=8):
+def quantize_probabilities(p, bits=8, range_check=True):
     assert bits <= 32
     assert bits >= 1
     max = numpy.max(p)
     min = numpy.min(p)
-    assert max <= 1.0, max
-    assert min >= 0.0, min
+    if range_check:
+        assert max <= 1.0, max
+        assert min >= 0.0, min
 
     steps = (2**bits)
 
@@ -74,7 +75,12 @@ def reshape_leaves_as_features(leaves):
     return vv
 
 
+
+
 def optimize(estimator, n_samples, n_classes, leaf_quantization=None, leaves_per_class=None):
+    """
+    NOTE: mutates @estimator
+    """
 
     # Find leaves
     leaves = get_leaves(estimator)
@@ -163,17 +169,48 @@ def optimize(estimator, n_samples, n_classes, leaf_quantization=None, leaves_per
             is_leaf = (e.tree_.children_left == -1) & (e.tree_.children_right == -1)
             values = e.tree_.value
             vv = reshape_leaves_as_features(values)
+            #print('v', vv.shape, cluster.cluster_centers_.shape)
+            #print(cluster.cluster_centers_)
             c_idx = cluster.predict(vv)
             centroids = cluster.cluster_centers_[c_idx]
+            # ensure that stored leaves are quantized
+            # cluster centers are continious and might be in-between quantized input values
+            if leaf_quantization is not None:
+                centroids = quantize_probabilities(centroids, bits=leaf_quantization, range_check=False)
             #print('SS', centroids.shape)
             #print('cc', len(numpy.unique(centroids, axis=0)), len(numpy.unique(c_idx)))
             # XXX: is this correct ??
             v = numpy.where(numpy.expand_dims(is_leaf, -1), centroids, numpy.squeeze(values))
             v = numpy.reshape(v, values.shape)
-
             for i in range(len(e.tree_.value)):
                 e.tree_.value[i] = v[i]
-    
+
+    # check post-conditions
+    out_leaves = numpy.squeeze(get_leaves(estimator))
+    out_leaves_unique = numpy.unique(out_leaves, axis=0)
+    n_unique = len(out_leaves_unique)
+    if False:
+        log.debug('optimize-check',
+            samples=n_samples,
+            unique=n_unique,
+            max_leaves=max_leaves,
+            quantization=leaf_quantization, leaves_per_class=leaves_per_class,
+        )
+    if leaf_quantization is not None:
+        if leaf_quantization == 0:
+            # should be majority. One leaf per class
+            assert n_unique == n_classes, (n_unique, n_classes)
+        else:
+            # should already be quantized to N bits
+            out_leaves_q = quantize_probabilities(out_leaves, bits=leaf_quantization, range_check=False)
+            assert (out_leaves == out_leaves_q).all()
+
+    if leaves_per_class is not None:
+        # should not have more than max_leaves
+        assert n_unique <= max_leaves, (n_unique, max_leaves, out_leaves_unique)
+
+    # Estimator has been modified
+    return None
 
 def setup_data_pipeline(data, quantizer=None):
 
