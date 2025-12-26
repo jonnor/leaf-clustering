@@ -401,7 +401,7 @@ def main():
     folds = int(os.environ.get('FOLDS', '5'))
     trees = config_number_list('TREES', '100')
     experiment = os.environ.get('EXPERIMENT', 'tree-minsamplesleaf')
-    feature_dtype = os.environ.get('FEATURE_DTYPE', None)
+    feature_dtype = os.environ.get('FEATURE_DTYPE', 'int16')
     n_jobs = int(os.environ.get('PARALLEL_JOBS', '-1'))
 
     depth_limiter_metric, depth_limiter_values = get_depth_limiter()
