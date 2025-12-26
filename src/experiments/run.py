@@ -82,6 +82,9 @@ def optimize(estimator, n_samples, n_classes, leaf_quantization=None, leaves_per
     NOTE: mutates @estimator
     """
 
+    if leaf_quantization == 0 and leaves_per_class is not None:
+        raise ValueError('Cannot have both majority voting and leaf clustering')
+
     # Find leaves
     leaves = get_leaves(estimator)
     assert leaves.shape[1] == 1, 'only single output supported'
@@ -419,11 +422,12 @@ def main():
         print(k, v)
 
     # Leaf clustering, with or without quantization
-    cluster_quantizers = [None, 0, 4, 8]
+    cluster_quantizers = [None, 4, 8]
     clusters = [ 1, 2, 4, 8, 16, 32 ] # XXX: None is skipped, since it comes after
     optimizers = [ {'quantize': q, 'cluster': c} for q in cluster_quantizers for c in clusters ]
 
     # Leaf quantization only, no clustering
+    # Also majority voting, leaf_bits=0
     quantizers = [ None, 0, 1, 2, 3, 4, 5, 6, 7, 8 ]
     optimizers += [ {'quantize': q, 'cluster': None} for q in quantizers ]
 
