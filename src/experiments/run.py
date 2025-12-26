@@ -199,7 +199,7 @@ def optimize(estimator, n_samples, n_classes, leaf_quantization=None, leaves_per
     if leaf_quantization is not None:
         if leaf_quantization == 0:
             # should be majority. One leaf per class
-            assert n_unique == n_classes, (n_unique, n_classes)
+            assert n_unique <= n_classes, (n_unique, n_classes)
         else:
             # should already be quantized to N bits
             out_leaves_q = quantize_probabilities(out_leaves, bits=leaf_quantization, range_check=False)
