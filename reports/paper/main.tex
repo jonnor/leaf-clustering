@@ -12,6 +12,7 @@
 \usepackage{amsfonts}       % blackboard math symbols
 \usepackage{nicefrac}       % compact symbols for 1/2, etc.
 \usepackage{microtype}      % microtypography
+\usepackage[strings]{underscore} % make sure _ in strings like \texttt works 
 \usepackage{floatrow}
 %\usepackage{natbib}
 \usepackage{doi}
@@ -44,21 +45,22 @@
 
 %% Abstract
 \begin{abstract}	\noindent
-The Random Forest algorithm has been very successful, and continue to be a powerful choice on low-power microcontrollers with small amounts of memory and compute.
-Current size-optimized implementations of Random Forest tend to use hard majority voting, where each decision tree returns the most probable class, instead of the class proportions (probabilities).
-We show that the hard majority voting rule can lead to a considerable drop in predictive performance on some datasets.
-To find a better tradeoff between predictive performance and model size, we propose to use quantization and K-means clustering to adaptively select a small set of class proportions to store for the decision trees.
-We evaluate the proposed method on 60 classification datasets from the OpenML CC18 benchmark suite.
-Find that only a few class probabilities need to be stored to retain good performance,
-with small increase in model size over hard majority voting.
-When combined with 16-bit integer quantization of the input features, the method reached average model compression of XX, when staying within XXX percentage point performance drop.
-The method is implemented in the open-source TinyML library emlearn, and demonstrated running on microcontrollers for Human Activity recognition tasks.
+The Random Forest algorithm has been very successful, and continue to be a powerful choice on low-power embedded systems with small amounts of memory and compute.
+Current size-optimized implementations of Random Forest inference tend to use hard majority voting, where each decision tree returns the most probable class, instead of the class proportions (probabilities).
+We show that while compact, the hard majority voting rule can lead to a large drop in predictive performance on some datasets.
+To enable a better tradeoff between predictive performance and model size,
+we propose two methods to compress the model:
+using leaf quantization with deduplication, or leaf clustering with K-means.
+By evaluating using 60 classification datasets from the OpenML CC18 benchmark suite,
+we find that only a few class probabilities need to be stored to retain good performance, with small increase in model size over hard majority voting.
+When combined with 16-bit integer quantization of the input features, reducing the number of trees, the method reached average model compression of XXX, when staying within XXX percentage point performance drop of the uncompressed baseline.
+The method is implemented in the open-source TinyML library emlearn,
+and demonstrated running on microcontrollers for Human Activity recognition tasks.
 
 % Keywords. Maximum 5
 \noindent \textbf{Keywords}: Random Forest, TinyML, model compression, tree-based ensemble
 
 \end{abstract}
-
 
 \section{Introduction}
 
@@ -66,12 +68,22 @@ Big picture motivation.
 TinyML use-cases.
 TinyML setting. On device inference. Low power. Wireless sensing.
 
+Importance of small models.
+Microcontroller. Limited program storage (FLASH) and memory (SRAM).
+
 \noindent
 
 \newpage
 \section{Background}
 
-\cite{random_forest_breiman2001}
+Random Forest model was originally introduced by \cite{random_forest_breiman2001}
+
+Decision tree ensembles have several properties that make them attractive
+for resource-constrained environments.
+Fast inference
+Easy to implement with integer-only arithmetic.
+High predictive performance with minimal hyperparameter tuning.
+Works well with small and medium sized datasets.
 
 Success cases for Random Forest in TinyML.
 Human Activity Recognition. \cite{elsts_are_2021}
@@ -79,21 +91,49 @@ Animal behavior. \cite{tatler_high_2018} \cite{kleanthous_feature_2020} \cite{tr
 
 % REGRESSION, not classification Battery monitoring. \cite{mawonou_state--health_2021}
 
-TODO: illustration of tree structure
-TODO: illustration of the storage, of decision nodes and leaves
+
 Structure of a random forest.
-Decision nodes, leaf nodes.
-Voting rules. argmax / Hard majority.
+
+Logically, a decision tree ensemble consists of a set of binary decision trees.
+Each tree has decision nodes that evaluate a set of if-else conditions,
+comparing one of the features of the input data to a learned threshold value. 
+At the leaves of the trees are the classification predictions for that tree.
+
+The leaves can either be a class index, in which case the ensemble prediction is done by counting the number of votes and outputting the majority.
+
 Probability average. Soft.
+% TODO: have some references to proportions, when it was introduced?
 
-Fully grown versus partially grown trees.
-Fully grown, all leaves with end up with class proportions.
-However when there are restrictions. Such as \hyperparam{max_depth}, \hyperparam{min_samples_leaf}, \hyperparam{min_samples_split} etc.
-In resource constrained environments, this is the more realistic case.
 
+% TODO: illustration of logical tree structure
+
+There are multiple ways of representing the decision tree ensemble at inference time.
+% TODO: some references to other approaches
+% As implemented in scikit-learn \cite{scikit-learn} RandomForestClassifier.
+
+Here we use an approach consisting of two tables:
+a table of decision nodes, plus a table of leaf nodes. 
+
+Each decision node consists of feature index, threshold value, left child index and right child index.
+The left/right indices can either be an offset to a new decision node, or an offset into the table of leaf nodes (encoded as negative values).
+This memory layout is illustrated in Figure XXX: FIXME.
+% TODO: illustration of the storage, of decision nodes and leaves
+
+Each entry in the leaf node table has XXXX class proportions.
 
 Class probabilities. 32 bit floating point.
 $leaf_size: n_leaves * n_classes * 4 bytes$
+
+
+If there are no restrictions on tree depth,
+all leaves end up only containing samples from a single class.
+In this circumstance, storing only the class index (instead of class proportions) preserves all the information in the tree.
+However, when there are restrictions on tree depth
+(for example with scikit-learn hyperparameters \hyperparam{max_depth}, \hyperparam{min_samples_leaf}, \hyperparam{min_samples_split}, et.c.)
+the leaves will containe a mix of class proportions.
+
+In resource constrained environments, this is the more realistic case.
+
 
 Ensemble voting rule:
 \begin{verbatim}
@@ -104,7 +144,6 @@ for tree in forest:
 proba = mean(probabilities, axis=1)
 \end{verbatim}
 
-As implemented in scikit-learn \cite{scikit-learn} RandomForestClassifier.
 
 Hard majority. argmax. With leaf-deduplication.
 Using 1 byte for the class indices, allows up to 255 classes.
@@ -123,15 +162,19 @@ proba = votes / n_classes
 
 As implemented in emlearn 0.9.0 (2019) \cite{emlearn}.
 
-Proposed. Use soft voting rule. Reduce $n_leaves$ using clustering and reduce bitdepth using quantization.
+Proposed. Use soft voting rule.
+Reduce $n_leaves$ using clustering and reduce bitdepth using quantization.
+
 
 \subsection{Related work}
 
-Optimization techniques for decision trees and decision tree ensembles such as Random Forest has been studied extensively over the last decades, including in a low-power, low-compute setting.
+Optimization techniques for decision trees and decision tree ensembles (such as Random Forest) has been studied extensively over the last decades, including in a low-power and low-compute settings.
 
 Integer quantization of features.
-FPGA/hardware related.
+FPGA/hardware related. FIXME: references
+
 SIMD tree evaluation.
+TODO: cite QuickScorer/RAPIDSCORER, Fast Inference of Tree Ensembles on ARM Devices
 
 Optimization for microcontrollers \cite{tabanelli_optimizing_2022}
 Feature selection. \cite{uddin_guided_2015}, \cite{elsts_energy-efficient_2020}
@@ -140,42 +183,88 @@ Parallelization.
 Cache-awareness.
 
 Software tools for deploying RF to TinyML. Open-source
-
+% TODO: cite m2cgen, emlearn, etc
 
 \section{Methods}
+
 What we cover: Feature quantization. Leaf quantization. Leaf clustering.
 
-OpenML CC18 datasets. \cite{oml-benchmarking-suites}
-To avoid needing data imputation, the datasets with missing values were ignored.
-TODO: list exact identifiers for that which was eliminated
+\subsection{Comparison of leaf compression strategies on OpenML CC18}
+
+
+A subset of datasets from the OpenML CC18 benchmarking suite\cite{oml-benchmarking-suites} were used as a basis for the evaluation. 
+To avoid needing data imputation, the datasets with missing values were dropped,
+and to avoid datasets which require substantial feature selection or engineering, datasets more than FIXME:XX features were dropped.
+The selection removed FIXME:XXX datasets, leaving a total of FIXME:XXX datasets. The complete list can be found in the results.
+% MAYBE: list exact identifiers that which was eliminated?
+
+Numerical variables are scaled using RobustScaler, and categorical variables are encoded using OrdinalEncoder.
 
 Train a general model. Using scikit-learn. \cite{scikit-learn}
-Using 10 trees ({n_estimators}). And {min_samples_leaf=0.01}.
-NOTE: clustering will probably save more in percent, the more leaves are used.
-Increases both with the number of trees, and the effective depth
-- but total model sizes in excess of 100 kB is less relevant for the typical usecase
 
-TODO: consider other values for {min_samples_leaf} ?
-Either multiple, or tune on datasets.
-It will affect leaf growth.
+Apply compression strategy to trained model. Re-running predictions on test set.
+Cross validation using k-fold, with k=5.
 
 Metric. AUC ROC one-versus-all.
 
-Numerical variables are scaled using RobustScaler.
-Categorical variables are encoded using OrdinalEncoder.
 
-Apply compression strategy to trained model. Re-running predictions on test set.
 
-Cross validation using stratified k-fold.
+All experiments were done with int16 as feature representation,
+which reduces the size of decision nodes considerably compared to float32, while still allowing a sufficient range to give equivalent results on most datasets/tasks.
+% FIXME: references to existing papers
+We also found that int16 features resulted in the same performance as float32 on the selected datasets (not shown).
+The conversion from original feature data to 16-bit integers was done using robust min-max scaling between 0.01 percentile and 99.9 percentile.
+
+
+An overview of the different model compression strategies can be seen in Table \ref{fig:leaf_uniqueness}. 
+The Baseline configuration uses the default scikit-learn hyper-parameters (as of version FIXME), 100 trees (\texttt{n_estimators}) and no limit to tree depth (\texttt{min_samples_leaf=1}).
+All other configurations used 10 trees (more representative for models for resource constrained targets), and a range of tree depths were considered by trying \texttt{min_samples_leaf} values between 1,2,4,8,16,32,64,128.
+For Quantize we use between 1-8 bit quantization, and for ClusterQ8 consider 1,2,4,8,16,32 clusters per class.
+
+%NOTE: clustering will probably save more in percent, the more leaves are used.
+%Increases both with the number of trees, and the effective depth
+%- but total model sizes in excess of 100 kB is less relevant for the typical usecase
+
+\begin{table}[h]
+\centering
+\begin{tabular}{llllll}
+\hline
+\textbf{Strategy} & \textbf{Trees} & \textbf{Leaf representation} & \textbf{Deduplication} & \textbf{Clustering} & \textbf{Options} \\
+\hline
+Baseline & 100 & float32 & No & No  \\
+Reduced & 10 & float32 & No & No \\
+Majority & 10 & none & Yes & No \\
+Deduplicate & 10 & float32 & Yes & No \\
+Quantize & 10 & uint8 & Yes & No & 1-8 bit quantization \\
+ClusterQ8 & 10 & uint8 & Yes & Yes & 1,2,4,8,16,32 clusters per class \\
+% ClusterQ4 & 10 & 4+4 bits in uint8 & Yes & Yes \\
+\hline
+\end{tabular}
+\caption{Experimental configurations}
+\label{tab:models}
+\end{table}
+
+
+\subsection{Evaluation on hardware for Human Activity Recognition}
 
 ? Demonstrator of performance on one or few TinyML tasks/datasets.
-HAR: PAMAP. UCI DSADS. OPPORTUNITY ? F1 scores. 
+HAR: PAMAP. UCI DSADS. OPPORTUNITY ?
+F1 scores. 
+
+Feature process. TODO: decide. MiniRocket ?? Any pre-selection?
+
 Comparisons with other frameworks. Leaf cluster (emlearn), m2cgen, micromlgen
-Hardware architectures. ARM Cortex M0+ (no FPU). ESP32 (FPU). Alt: Cortex M4F
-TODO: visualization. Panel over HW,dataset of scatterplots with model size and inference time
-Need to implement feature computation also.
+
+Hardware architectures.
+RP2040 ARM Cortex M0+ (no FPU). 
+Nordic NRF52840 ARM Cortex M4F
+ESP32 (FPU).
+
+TODO: visualization. Panel over HW, dataset of scatterplots with model size and inference time
+
 
 \footnote{The code for reproducing the experiments can be found at https://github.com/jonnor/leaf-quantization}
+% FIXME: double check link before submission
 
 \newpage
 \section{Results}
@@ -213,11 +302,6 @@ This happens independently of the exact hyperparameter used to limit tree growth
 
 % TODO: run experiments for all hyperparameters restricting tree depth
 % But probably no need to include all figures in the paper
-% scikit-learn RandomForest hyperparameters affecting tree depth and leaf nodes (number/split/composition)
-% direct restrictors on leaves
-% min_weight_fraction_leaf, min_samples_leaf, max_leaf_nodes
-% indirect restrictions
-% max_depth, min_samples_split, min_impurity_decrease, ccp_alpha
 
 Since unique leaves cannot be deduplicated and must be stored individually, this leads to a larger proportion of the total model size taken up by leaves.
 This can be seen in Figure \ref{fig:leaf_proportions}).
@@ -225,7 +309,7 @@ This leads to a potential for saving space by optimizing how leaves are stored.
 
 TODO: also show \hyperparam{max_depth}  
 
-FIXME: check which leaf size is used. Should be 32-bit floating point for.
+FIXME: Leaf size used. Should be 32-bit floating point for leaf probabilities.
 And int16 features?
 
 \begin{figure}
@@ -244,8 +328,10 @@ And int16 features?
 \end{figure}
 
 TODO: results with leaf clustering (and quantization) enabled
-Thesis: is pareto optimal in terms of predictive performance vs model size, when compared to majority and full soft voting
-? how to show that this holds across all (or majority) of datasets
+Thesis: is Pareto optimal in terms of predictive performance vs model size, when compared to majority and full soft voting
+
+
+
 
 \subsection{Tests on microcontroller hardware}
 
@@ -266,10 +352,8 @@ Execution time (and power consumption) is less of a problem.
 
 \subsection{Further work}
 
-Here we only considered the use of Random Forest for classification.
-The models are also used for regression.
-Explore whether leaf clustering could also be useful for regression.
-
+Here we only considered the use of leaf quantization and leaf clustering for classification, however we suspect that these methods would also be beneficial for  regression tasks.
+The methods may also be useful for gradient-boosted trees (such as XGBoost, LightGBM, etc).
 
 %\newpage
 \section{Conclusions}
@@ -278,7 +362,9 @@ Explore whether leaf clustering could also be useful for regression.
 \section*{Acknowledgements}
 \noindent
 
-Martin Stensgård
+We would like to thank Martin Stensgård for multiple insightful and productive discussions about low-level optimization of decision tree inference on microcontroller CPU arcitectures. 
+
+Soundsensing has in the period 2022-2025 received funding from Research Council of Norway as part of the project EARONEDGE\cite{earonedge_nfr}.
 
 % References
 \newpage
