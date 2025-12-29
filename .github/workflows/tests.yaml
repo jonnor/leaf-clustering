@@ -96,10 +96,10 @@ jobs:
             { experiment: min_samples_leaf_trees10, config: 'TREES=10 MIN_SAMPLES_LEAF=1,2,4,8,16,32,64,128' },
             { experiment: min_samples_leaf_trees20, config: 'TREES=20 MIN_SAMPLES_LEAF=1,2,4,8,16,32,64,128' },
             { experiment: min_samples_leaf_trees40, config: 'TREES=40 MIN_SAMPLES_LEAF=1,2,4,8,16,32,64,128' },
-            { experiment: min_samples_split_trees10, config: 'TREES=10 MIN_SAMPLES_SPLIT=2,4,8,16,32,64,128,256' },
-            { experiment: max_leaf_nodes_trees10, config: 'TREES=10 MAX_LEAF_NODES=3,5,11,20,38,73,136,256,480,900,1687,3162' },
-            { experiment: min_impurity_decrease_trees10, config: 'TREES=10 MIN_IMPURITY_DECREASE=0.00,0.0001,0.0002,0.0004,0.0008,0.0016,0.0032,0.0063,0.0126,0.0251,0.0501,0.1' },
-            { experiment: max_depth_trees10, config: 'TREES=10 MAX_DEPTH=20,18,16,14,12,10,8,6,4,2' },
+            #{ experiment: min_samples_split_trees10, config: 'TREES=10 MIN_SAMPLES_SPLIT=2,4,8,16,32,64,128,256' },
+            #{ experiment: max_leaf_nodes_trees10, config: 'TREES=10 MAX_LEAF_NODES=3,5,11,20,38,73,136,256,480,900,1687,3162' },
+            #{ experiment: min_impurity_decrease_trees10, config: 'TREES=10 MIN_IMPURITY_DECREASE=0.00,0.0001,0.0002,0.0004,0.0008,0.0016,0.0032,0.0063,0.0126,0.0251,0.0501,0.1' },
+            #{ experiment: max_depth_trees10, config: 'TREES=10 MAX_DEPTH=20,18,16,14,12,10,8,6,4,2' },
         ]
 
     steps:
