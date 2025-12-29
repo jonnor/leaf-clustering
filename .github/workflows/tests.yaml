@@ -132,7 +132,7 @@ jobs:
 
       - name: Run experiments
         run: |
-           EXPERIMENT=${{ matrix.depth_limiter.experiment }} ${{ matrix.depth_limiter.config }} REPETITIONS=1 python -m src.experiments.run
+           EXPERIMENT=${{ matrix.depth_limiter.experiment }} ${{ matrix.depth_limiter.config }} PARALLEL_JOBS=1 REPETITIONS=1 python -m src.experiments.run
 
       - uses: actions/upload-artifact@v4
         with:
