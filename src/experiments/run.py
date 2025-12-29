@@ -447,7 +447,7 @@ def main():
 
         # feature quantization (optional)
         quantizer = None
-        if config.get('dtype'):
+        if config.get('dtype', 'float') != 'float':
             quantizer = Quantizer(dtype=config['dtype'],
                 max_quantile=0.001, out_max=config['target_max'])
 
