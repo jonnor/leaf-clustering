@@ -1,24 +1,53 @@
 
 ## TODO
 
+
 - Re-run plots in notebooks with latest results
-- Use int16 features as main for the experiments
+- Rename the experiments.
 - Move plotting code from notebooks to scripts
 - Add plotting code to a Actions step
-- Put complete pareto frontier plots into Appendix 1
-- Change or add HAR training script to output multiple models
+- Add an overall figure comparing strategies. perf change VS size reduction ratio, for each strategy?
+- Add an overall results table per-dataset, comparing strategies
+
+On-device section
+
+- Change or add HAR training script to output multiple models.
+Generate X different models, varying min_samples_leaf, for both datasets.
+Output a bunch of C files. Use defines to include only the relevant stuff?
 - Make script to automate the device test runs.
-Run X models, X frameworks, on 1 microcontrollers
-Generate X different models, of different sizes and for both datasets
+Run X models on X datasets, X frameworks, on 1 microcontrollers.
+Switching microcontrollers manually.
 - Run framework comparisons on microcontrollers
-- Investigate hyperparameter for controlling leaf clustering
+- Plot program size versus prediction accuracy.
+Show pareto front for each framework
+- Plot inference time vs prediction accuracy
 
-Split out emlearn inline plus loadable?
-? try to place loadable in
 
-Maybe change to 256 window size on PAMAP2
+Ideas:
 
-Rename the experiments. hard, soft-f32, soft-u8, cluster-u8, soft-u4, cluster-u4 ?
+- Investigate alternative hyperparameter for controlling leaf clustering
+than (average) clusters_per_class.
+
+
+## Experimental configurations
+
+To compare strategies. Step by step
+
+- Baseline. 100 trees, no leaf limit. ANCHOR
+- Reduced. 10 trees, float leaf
+- Majority. 10 trees, majority voting
+- Deduplicated. 10 trees, float leaf, deduplication on
+- Quantized. 10 trees, quantization leaves + dedup
+- Cluster Q8. 10 trees, 8bit quant leaves + cluster
+- Cluster Q4. 10 trees, 4bit quant leaves + cluster
+
+All using int16 feature representation.
+
+For result table.
+All using the best result in category.
+
+
+best leaf limit
 
 
 ## Claims
