@@ -101,6 +101,116 @@ Smartphone collection. 19 individuals.
 Not fixed orientation or placement of the smartphone,
 
 
+
+#### Tree Model Quantization for Embedded Machine Learning Applications
+
+Summarization of talk at TinyML 2021
+tinyML Summit 2021 Partner Session: Tree Ensemble Model Compression for Embedded Machine Learning
+https://www.youtube.com/watch?v=KTjkWSU6R2o
+Leslie Schradin
+
+https://sensei.tdk.com/tree-model-quantization-for-embedded-machine-learning-applications/
+
+> In our experience at Qeexo we have found that tree-based models often outperform
+> all other model types when the models are constrained to be small in size (e.g. < 100s KB)
+> or when there is relatively little available data (e.g. < 100,000 training examples).
+> Both of these conditions are often true for machine learning problems targeting embedded devices.
+
+For Qeexo AutoML.
+Leaf quantization using affine transformation. Scaling and shift.
+Across all leaf values in a single tree.
+Used 8 bit leaves for the example.
+
+Also showed 8 bit feature tresholds, but have to dequantize and store per-feature transforms. Net gain low.
+In their example, leaves and nodes took of original float model took approx same space.
+
+Parent. Abandoned as of December 2025
+https://patents.google.com/patent/US20220114457A1/en
+
+#### Fast Inference of Tree Ensembles on ARM Devices
+https://arxiv.org/abs/2305.08579
+May 2023
+Simon Koschel, Sebastian Buschjäger, Claudio Lucchese, Katharina Morik
+
+QuickScorer/RAPIDSCORER are SIMD evaluations for decision tree ensembles.
+
+> In this paper, we convert the popular QuickScorer algorithm and its siblings from Intel's AVX to ARM's NEON instruction set.
+> Second, we extend our implementation from ranking models to classification models such as Random Forests.
+> Third, we investigate the effects of using fixed-point quantization in Random Forests.
+> Our study shows that a careful implementation of tree traversal on ARM CPUs leads to a speed-up of up to 9.4 compared to a reference implementation
+
+
+Compared 16 bit integers and 32 bit floatsfor leaf nodes and splits.
+On 4 dataset int16 gave same performance.
+But on EEG dataset, quantization of the leaf values leads to a drop of nearly 4 percentage points.
+
+#### Boosted Trees on a Diet: Compact Models for Resource-Constrained Devices
+https://arxiv.org/abs/2510.26557
+Jan Stenkamp, Nina Herrmann, Benjamin Karic, Stefan Oehmcke, Fabian Gieseke
+
+Training compact boosted decision tree ensembles that exhibit a reduced memory footprint by rewarding,
+among other things, the reuse of features and thresholds during training.
+Our experimental evaluation shows that models achieved
+the same performance with a compression ratio of 4-16x compared to LightGBM models.
+
+#### Joint leaf-refinement and ensemble pruning through regularization
+Published: 15 March 2023
+https://link.springer.com/article/10.1007/s10618-023-00921-z
+
+Sebastian Buschjäger & Katharina Morik.
+TU Dortmund University
+
+> leaf-refinement is a technique that improves the performance of a tree ensemble
+> by jointly re-learning the probability estimates in the leaf nodes of the trees
+> introduce L1 regularization into the leaf-refinement objective,
+> which allows us to jointly prune and refine trees at the same time
+
+Stores probabilities in each leaf node can be stored within a 2 Byte (int16).
+
+> This operation is also implemented in FastInference,
+> and we could not detect any change in the accuracy with this quantization.
+
+Deployed a 20 kB model to PhyNode (MSP430 MCU).
+
+https://github.com/sbuschjaeger/fastinference?tab=readme-ov-file
+
+#### Compressing tree ensembles through Level-wise Optimization and Pruning
+https://proceedings.mlr.press/v267/devos25a.html
+
+ICML 2025.
+
+Presents LOP, a method for compressing a given tree ensemble by pruning or entirely removing trees in it,
+while updating leaf predictions in such a way that predictive accuracy is mostly unaffected. 
+
+Tested both Random Forest and XGB models.
+For RF, showed extreme compressions of 100-10000x.
+
+! shows connection to original model Pareto fronts
+
+Compares with Global Refinement.
+
+#### Global refinement of random forest
+S Ren, X Cao, Y Wei, J Sun
+Proceedings of the IEEE conference on computer vision and 2015•
+https://openaccess.thecvf.com/content_cvpr_2015/papers/Ren_Global_Refinement_of_2015_CVPR_paper.pdf
+
+Describes how to refine leaf values across an entire forest as a post-processing step.
+
+#### ResOT: Resource-Efficient Oblique Trees for Neural Signal Classification
+
+Bingzhao Zhu, Masoud Farivar, and Mahsa Shoaran
+2020
+IEEE TRANSACTIONS ON BIOMEDICAL CIRCUITS AND SYSTEMS
+
+As opposed to axis-aligned decision trees, oblique trees use multiple features to make splits.
+
+> Training oblique trees is not a trivial task, as the weights are not differentiable. In addition, without compressing the tree structure, oblique trees may grow overly complex and use many features to make splits, increasing both the model size and node complexity.
+> To tackle these issues, we introduce the oblique trees with probabilistic splits.
+> Rather than deterministically routing a decision tree, we send a sample to the left or right subtree based on a probability value.
+> With this probabilistic routing, we can derive the objective function and train oblique trees with gradient-based optimization algorithms, and use various compression techniques applied to neural networks.
+
+
+
 # Ideas
 
 ### Positional encoding in demand trees
@@ -187,3 +297,25 @@ https://github.com/STMicroelectronics/STMems_Machine_Learning_Core
 https://dl.acm.org/doi/10.1145/3358175
 
 ? how is classificatio done
+
+
+# Less related
+
+#### Human Activity Recognition on Microcontrollers with Quantized and Adaptive Deep Neural Networks
+Focuses more on CNN. With RF as baseline
+
+https://dl.acm.org/doi/10.1145/3542819
+August 2022
+Daghero et al.
+
+Proposing a set of efficient one-dimensional Convolutional.
+Experiments on four datasets. UniMiB-SHAR. UCI HAPT. WISDM. WALK.
+Targeting an ultra-low-power RISC-V MCU.
+Pareto-optimal CNNs for HAR, compared to Random Forest baseline.
+
+Inference latency that ranges between 9 μs and 16 ms.
+Their memory occupation varies in 0.05–23.17 kB.
+
+Fixed-precision integer quantizations, namely, 8-bit, 4-bit, 2-bit, and 1-bit.
+PArameterized Clipping acTivation (PACT) quantization algorithm.
+Conv1d with Maxpool, followed by fully connected.

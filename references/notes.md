@@ -2,6 +2,7 @@
 ## TODO
 
 - Re-run plots in notebooks with latest results
+- Use int16 features as main for the experiments
 - Move plotting code from notebooks to scripts
 - Add plotting code to a Actions step
 - Put complete pareto frontier plots into Appendix 1
