@@ -2,6 +2,7 @@
 import seaborn
 import pandas
 import structlog
+import numpy
 
 import uuid
 import math
@@ -205,6 +206,106 @@ def plot_size_improvement(df, path, optimizer_param='leaves_per_class'):
 
     return g
 
+def compute_perf_change(df, reference, 
+        groupby='dataset',
+        metric='test_roc_auc',
+    ):
+    df = df.copy()
+
+    assert not df.empty
+    assert not reference.empty
+    ref_df = reference.reset_index().groupby(groupby).median(numeric_only=True)
+    
+
+    print(ref_df.head())
+
+    # Extract change in performance
+    def subtract_ref(df, metric='test_roc_auc'):
+        dataset = df.name
+        matches = ref_df.loc[dataset]
+        #assert len(matches) == 1, matches
+        ref = matches[metric]
+        out = df[metric] - ref
+        return out
+
+    def divide_ref(df, metric='test_roc_auc'):
+        dataset = df.name
+        matches = ref_df.loc[dataset]
+        #assert len(matches) == 1, matches
+        ref = matches[metric]
+        out = df[metric] / ref
+        return out
+
+    grouped = df.groupby(groupby, as_index=False)
+    df['perf_change'] = grouped.apply(subtract_ref, include_groups=False).reset_index().set_index('id')[metric]
+    df['size_change'] = grouped.apply(divide_ref, metric='total_size', include_groups=False).reset_index().set_index('id')['total_size']
+
+    return df
+
+def plot_overall_performance_vs_baseline(df, path=None, depth_limit='min_samples_leaf'):
+
+    # what we are comparing against
+    reference_experiment = 'sklearn_default_int16'
+    # Filter down to relevant data
+    experiment_prefix = 'min_samples_leaf_trees'
+
+    # XXX: maybe move this outside, shoud be shared for consistency?
+    df = name_strategies(df)
+
+    data = df[df.experiment.str.contains(experiment_prefix)]
+    ref = df[df.experiment.str.contains(reference_experiment)]
+
+    # Sanity checks
+    assert not ref.empty
+    # should have multiple trees
+    n_trees = data['trees'].unique()
+    assert len(n_trees) >= 2, n_trees
+    # should have mutiple depth levels
+    depth_limit_values = data[depth_limit].unique() 
+    assert len(depth_limit_values) >= 4, depth_limit_values
+
+    # Compute changes wrt baseline/reference
+    data = compute_perf_change(data, ref)
+
+    col_order = sorted(data.trees.unique(), reverse=True)
+    g = seaborn.relplot(data=data.reset_index(),
+        kind='line',
+        x=depth_limit,
+        y='perf_change',
+        hue='strategy',
+        col='trees',
+        col_order=col_order,
+        aspect=1,
+        height=3,
+        legend=True,
+        #errorbar=None,
+        #err_style='bars',
+        lw=2.0,
+        alpha=0.5,
+        # FIXME: set band parameters explicitly
+    )
+    g.set(xscale="log")
+    #g.set(xlim=(1, 100))
+    g.set(ylim=(-10, 2))
+    g.refline(y=0.0, alpha=0.8, ls='--')
+    #g.refline(y=-2.0, alpha=0.5, color='black')
+    #g.refline(y=-4.0, alpha=0.5, color='orange')
+    for i, ax in enumerate(g.axes.flatten()):
+        ax.grid()
+        if i >= 1:
+            x_axis = ax.axes.get_xaxis()
+            x_axis.get_label().set_visible(False)
+
+
+    #g.figure.suptitle('Performance drop over baseline')
+    g.figure.tight_layout()
+    g.figure.legends = []
+    g.figure.legend(loc="lower center", ncol=3)
+    g.figure.savefig(path)
+
+    if path is not None:
+        g.figure.savefig(path)
+        print('Wrote', path)
 
 
 def enrich_results(df,
@@ -212,11 +313,12 @@ def enrich_results(df,
         decision_node_bytes_default = 8):
 
     # compute storage size
-    leaf_bytes_per_class = df['leaf_bits'] / 8
+    leaf_bytes_per_class = numpy.ceil(df['leaf_bits'] / 8) # NOTE: no bit-packing, full bytes
     leaf_bytes_per_class = leaf_bytes_per_class.fillna(value=leaf_node_bytes_default).astype(int)
 
-    # FIXME: take the feature precision into account
-    decision_node_bytes = decision_node_bytes_default
+    decision_node_bytes = df['dtype'].map({'int16': 2, 'float': 4})
+    missing_decision_node_bytes = decision_node_bytes[decision_node_bytes.isna()]
+    assert len(missing_decision_node_bytes) == 0, df[decision_node_bytes.isna()][['dtype']]
 
     df = df.rename(columns={'test_leasize': 'test_leafsize'}) # Fixup typo
 
@@ -224,8 +326,10 @@ def enrich_results(df,
     df['leaf_size'] = df['test_leafsize'] * leaf_bytes_per_class * df['test_uniqueleaves']
     df['decision_size'] = decision_nodes * decision_node_bytes
     df['total_size'] = df['leaf_size'] + df['decision_size']
-
     df['test_roc_auc'] = 100.0 * df['test_roc_auc'] # scale up to avoid everything being in the decimals
+
+    # Practical aliases
+    df['trees'] = df['n_estimators']
 
     # Add identifier per row, for ease of merging data
     df['id'] = df.apply(lambda _: uuid.uuid4(), axis=1)
@@ -238,6 +342,7 @@ def comma_separated(s, delimiter=','):
     return tok
 
 ALL_PLOTS=[
+    'overall_performance',
     'size_improvement',
     'perf_vs_size',
     'leaf_quantization',
@@ -289,6 +394,10 @@ def main():
 
 
     out_dir = Path(args.out_dir)
+
+    if 'overall_performance' in args.plots:
+        plot_overall_performance_vs_baseline(df, path='hyperparam-perfdrop-trees-strategies.png')
+
 
     # FIXME: have a better way of marking the baseline to compare with
     if 'size_improvement' in args.plots:
