@@ -254,9 +254,11 @@ def plot_overall_performance_vs_baseline(df, path=None, depth_limit='min_samples
 
     data = df[df.experiment.str.contains(experiment_prefix)]
     ref = df[df.experiment.str.contains(reference_experiment)]
-
+   
     # Sanity checks
     assert not ref.empty
+    assert ref.trees.unique() == [100]
+    assert ref[depth_limit].unique() == [1]
     # should have multiple trees
     n_trees = data['trees'].unique()
     assert len(n_trees) >= 2, n_trees
@@ -278,11 +280,11 @@ def plot_overall_performance_vs_baseline(df, path=None, depth_limit='min_samples
         aspect=1,
         height=3,
         legend=True,
-        #errorbar=None,
+        errorbar=('ci', 95),
+        estimator='median',
         #err_style='bars',
         lw=2.0,
         alpha=0.5,
-        # FIXME: set band parameters explicitly
     )
     g.set(xscale="log")
     #g.set(xlim=(1, 100))
@@ -300,7 +302,7 @@ def plot_overall_performance_vs_baseline(df, path=None, depth_limit='min_samples
     #g.figure.suptitle('Performance drop over baseline')
     g.figure.tight_layout()
     g.figure.legends = []
-    g.figure.legend(loc="lower center", ncol=3)
+    g.figure.legend(loc="lower center", ncol=6)
     g.figure.savefig(path)
 
     if path is not None:
