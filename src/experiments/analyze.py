@@ -8,7 +8,17 @@ import uuid
 import math
 from pathlib import Path
 
+from src.utils.pareto import find_pareto_front
+
 log = structlog.get_logger()
+
+
+DEFAULT_STRATEGY_ORDER=[
+    'joint',
+    'majority',
+    'original',
+]
+
 
 def plot_leaf_quantization(df, path):
 
@@ -244,16 +254,16 @@ def compute_perf_change(df, reference,
 
 def plot_overall_performance_vs_baseline(df, path=None, depth_limit='min_samples_leaf'):
 
-    # what we are comparing against
-    reference_experiment = 'sklearn_default_int16'
-    # Filter down to relevant data
-    experiment_prefix = 'min_samples_leaf_trees'
-
     # XXX: maybe move this outside, shoud be shared for consistency?
     df = name_strategies(df)
 
-    data = df[df.experiment.str.contains(experiment_prefix)]
+    # what we are comparing against
+    reference_experiment = 'sklearn_default_int16'
     ref = df[df.experiment.str.contains(reference_experiment)]
+
+    # Filter down to relevant data
+    experiment_prefix = 'min_samples_leaf_trees'
+    data = df[df.experiment.str.contains(experiment_prefix)]
    
     # Sanity checks
     assert not ref.empty
@@ -309,6 +319,258 @@ def plot_overall_performance_vs_baseline(df, path=None, depth_limit='min_samples
         g.figure.savefig(path)
         print('Wrote', path)
 
+def leaf_add_grid(g, **kwargs):
+    for i, ax in enumerate(g.axes.flatten()):
+        ax.grid(**kwargs)
+
+def plot_leaf_uniqueness(df,
+        path=None,
+        experiment='min_samples_leaf_trees10',
+        depth_limit = 'min_samples_leaf',
+        strategy='original',
+    ):
+
+    # XXX: maybe move this outside, shoud be shared for consistency?
+    df = name_strategies(df)
+
+    is_data = (df.strategy == strategy) & (df.experiment.str.contains(experiment))
+    data = df[is_data]
+
+    # should be for a single tree
+    n_trees = data.trees.unique()
+    assert len(n_trees) == 1, n_trees
+
+    # should have mutiple depth levels
+    depth_limit_values = data[depth_limit].unique() 
+    assert len(depth_limit_values) >= 4, depth_limit_values
+
+
+    #fig, axs = plt.subplots(ncols=2)
+    height = 3.0
+    aspect = 1.5
+    g = seaborn.catplot(data=data,
+            x=depth_limit,
+            kind='box',
+            y='unique_leaves_percent', 
+            height=height,
+            aspect=aspect
+    )
+
+    g.set(ylim=(0, 105))
+    leaf_add_grid(g, axis='y')
+    g.figure.tight_layout()
+
+    if path is not None:
+        g.figure.savefig(path)
+        print('Wrote', path)
+
+def plot_leaf_size_proportion(df,
+        path=None,
+        experiment='min_samples_leaf_trees10',
+        depth_limit = 'min_samples_leaf',
+        strategy='original',
+    ):
+
+    # XXX: maybe move this outside, shoud be shared for consistency?
+    df = name_strategies(df)
+
+    is_data = (df.strategy == strategy) & (df.experiment.str.contains(experiment))
+    data = df[is_data]
+
+    # should be for a single tree
+    n_trees = data.trees.unique()
+    assert len(n_trees) == 1, n_trees
+
+    # should have mutiple depth levels
+    depth_limit_values = data[depth_limit].unique() 
+    assert len(depth_limit_values) >= 4, depth_limit_values
+
+    height = 3.0
+    aspect = 1.5
+    g = seaborn.catplot(data=data,
+            x=depth_limit,
+            kind='box',
+            y='leaf_size_percent', 
+            height=height,
+            aspect=aspect,
+    )
+
+    g.set(ylim=(0, 105))
+    leaf_add_grid(g, axis='y')
+    g.figure.tight_layout()
+
+    if path is not None:
+        g.figure.savefig(path)
+        print('Wrote', path)
+
+
+
+def aggregated_performance(df,
+        agg='median',
+        folds = 5,
+        repetitions = 1,
+        metrics = ['perf_change', 'total_size']
+    ):
+    results_per_group = repetitions * folds
+
+    # TODO: only user dataset,strategy
+    groupby = [
+        'dataset',
+        'strategy',
+        'min_samples_leaf',
+        #'trees',
+        'leaves_per_class'
+    ]
+
+    n_folds = df.folds.unique()
+    assert n_folds == [folds], n_folds
+
+    groups = df.groupby(groupby, as_index=True, dropna=False)
+
+    # check that we got all the results / have specified the groups correctly
+    for idx, g in groups:
+        mismatch = len(g) != results_per_group
+
+        leaf_bits_values = df.leaf_bits.unique()
+
+        if mismatch:
+            print(idx, len(g))
+            print(g['id'].nunique())
+            print(g['run'].unique())
+            print(g.head(30))
+            print(leaf_bits_values)
+            raise ValueError(f'wrong numer of values per group: {len(g)}, {results_per_group}')
+            
+    out = groups.agg(agg, numeric_only=True)[metrics]
+    return out
+
+
+def plot_performance_datasets(df,
+    path=None,
+    strategy_order=None,
+    experiment='min_samples_leaf_trees10',
+    depth_limit='min_samples_leaf',
+    ):
+
+    if strategy_order is None:
+        strategy_order = DEFAULT_STRATEGY_ORDER
+
+    # XXX: maybe move this outside, shoud be shared for consistency?
+    df = name_strategies(df)
+
+    # FIXME: use best-hyperparam for each dataset as the reference
+    #reference_experiment = 'sklearn_default_int16'
+    is_ref = (
+        df.experiment.str.contains(experiment) &
+        df.leaf_bits.isna() &
+        df.leaves_per_class.isna()
+    )
+    ref = df[is_ref]
+    #ref = df[df.experiment.str.contains(reference_experiment)]
+
+    data = df.copy() # reset_index()
+    data = data[data.experiment.str.contains(experiment)]
+    data = data[data.strategy.isin(strategy_order)]
+
+    # drop the different quantization options
+    data = data[data.leaf_bits != 8]
+    #data = data[data.leaf_bits.isin([None, 8, 0])]
+
+    # Sanity checks
+    assert not ref.empty
+    assert ref.trees.unique() == [10]
+    #assert ref[depth_limit].unique() == [1]
+
+    # should be for a single tree
+    n_trees = data.trees.unique()
+    assert len(n_trees) == 1, n_trees
+
+    # Compute changes wrt baseline/reference
+    data = compute_perf_change(data, ref)
+
+    # Aggregate over the folds/repretitions
+    data = aggregated_performance(data)
+    data = data.sort_values('dataset', ascending=False)
+
+    def find_pareto(df,
+        cost_metric='total_size',
+        performance_metric='perf_change',
+        min_performance=-10.0,
+        ):
+
+        pareto_params = dict(
+            cost_metric=cost_metric,
+            performance_metric=performance_metric,
+            min_performance=min_performance,
+        )
+        
+        pf = find_pareto_front(df, **pareto_params)
+        pf['point'] = numpy.arange(len(pf))
+        pf = pf.set_index('point')
+        return pf
+
+    # Plot pareto front as lines
+    pareto = data.groupby(['dataset', 'strategy'], as_index=True).apply(find_pareto)
+    g = seaborn.relplot(data=pareto.reset_index(),
+                    kind='line',
+                    col='dataset',
+                    col_wrap=6,
+                    y='perf_change',
+                    x='total_size',
+                    hue='strategy',
+                    hue_order=strategy_order,
+                    height=3.0,
+                    aspect=1.0,
+                    legend=True,
+                   )
+
+    # Add scatter plots of original data
+    for ax, (_, facet_data) in zip(g.axes.flat, g.facet_data()):
+        facet_dataset = facet_data.dataset.unique()
+        #print(facet_dataset)
+        assert len(facet_dataset) == 1
+        facet_dataset = facet_dataset[0]
+        scatter_data = data.loc[facet_dataset]
+        seaborn.scatterplot(ax=ax,
+            data=scatter_data.reset_index(),
+            y='perf_change',
+            x='total_size',
+            hue='strategy',
+            hue_order=strategy_order,
+            alpha=0.5,
+            legend=False,
+            s=5.0,
+            zorder=1,
+        )
+        
+    # Configure scale
+    g.set(xscale="log")
+    g.set(ylim=(-10, 5))
+    g.set(xlim=(100, 100e3))
+    g.refline(y=0.0, ls='-', color='black', alpha=0.5, lw=1.0)
+
+    # Configure legend
+    g.figure.legends = []
+    g.figure.legend(loc="upper center", ncol=3)
+    g.figure.tight_layout()
+
+    # Configure grid
+    from matplotlib.ticker import LinearLocator, FixedLocator, MultipleLocator
+    for ax in g.axes.flat:
+        ax.grid(True, which='major', axis='x', linestyle='-', linewidth=1.0)
+        ax.grid(True, which='major', axis='y', linestyle='-', linewidth=1.0)
+        ax.grid(True, which='minor', axis='y', linestyle='-', linewidth=0.3)
+        ax.yaxis.set_major_locator(MultipleLocator(5.0))
+        ax.yaxis.set_minor_locator(MultipleLocator(1.0))
+
+    # Reduce space beween subplots, and make room for legend up top
+    g.figure.subplots_adjust(wspace=0.05, hspace=0.15, top=0.98)
+
+    if path is not None:
+        g.figure.savefig(path)
+        print('Wrote', path)
+
+    return g.figure
 
 def enrich_results(df,
         leaf_node_bytes_default=4,
@@ -330,6 +592,9 @@ def enrich_results(df,
     df['total_size'] = df['leaf_size'] + df['decision_size']
     df['test_roc_auc'] = 100.0 * df['test_roc_auc'] # scale up to avoid everything being in the decimals
 
+    df['leaf_size_percent'] = 100.0 * (df['leaf_size'] / df['total_size'])
+    df['unique_leaves_percent'] = 100.0 * (df['test_uniqueleaves'] / df['test_leaves'])
+
     # Practical aliases
     df['trees'] = df['n_estimators']
 
@@ -344,6 +609,8 @@ def comma_separated(s, delimiter=','):
     return tok
 
 ALL_PLOTS=[
+    'dataset_results_pareto',
+    'leaf_analysis',
     'overall_performance',
     'size_improvement',
     'perf_vs_size',
@@ -400,6 +667,12 @@ def main():
     if 'overall_performance' in args.plots:
         plot_overall_performance_vs_baseline(df, path='hyperparam-perfdrop-trees-strategies.png')
 
+    if 'dataset_results_pareto' in args.plots:
+        plot_performance_datasets(df, path='perf-pareto-datasets.png')
+
+    if 'leaf_analysis' in args.plots:
+        plot_leaf_size_proportion(df, path='leaf-proportion.png')
+        plot_leaf_uniqueness(df, path='leaf-uniqueness.png')
 
     # FIXME: have a better way of marking the baseline to compare with
     if 'size_improvement' in args.plots:
