@@ -623,31 +623,34 @@ def style_multiindex_latex(df, bold_metrics=None, threshold_metrics=None, decima
         decimals = decimal_places.get(metric, 3)  # default 3 decimals
         return f"{val:.{decimals}f}"
     
-    # Apply styling to values
-    for exp in df.columns.get_level_values(0).unique():
-        # Bold best results
-        if bold_metrics:
-            for metric, mode in bold_metrics.items():
-                col = (exp, metric)
-                if col in df.columns:
-                    best_idx = df[col].idxmax() if mode == 'max' else df[col].idxmin()
-                    val = df.loc[best_idx, col]
+    # Bold best results per row for each metric
+    if bold_metrics:
+        for metric, mode in bold_metrics.items():
+            # Get all columns for this metric
+            metric_cols = [col for col in df.columns if col[1] == metric]
+            
+            # For each row, find and bold the best value
+            for idx in df.index:
+                row_vals = df.loc[idx, metric_cols]
+                best_col = row_vals.idxmax() if mode == 'max' else row_vals.idxmin()
+                val = df.loc[idx, best_col]
+                fmt = format_value(val, metric)
+                styled.loc[idx, best_col] = f"\\textbf{{{fmt}}}"
+    
+    # Color by threshold
+    if threshold_metrics:
+        for metric, thresh in threshold_metrics.items():
+            metric_cols = [col for col in df.columns if col[1] == metric]
+            
+            for col in metric_cols:
+                for idx in styled.index:
+                    val = df.loc[idx, col]
+                    # Skip if already styled (bold)
+                    if isinstance(styled.loc[idx, col], str):
+                        continue
+                    color = 'subtlegreen' if val >= thresh else 'red'
                     fmt = format_value(val, metric)
-                    styled.loc[best_idx, col] = f"\\textbf{{{fmt}}}"
-        
-        # Color by threshold
-        if threshold_metrics:
-            for metric, thresh in threshold_metrics.items():
-                col = (exp, metric)
-                if col in df.columns:
-                    for idx in styled.index:
-                        val = df.loc[idx, col]
-                        # Skip if already styled (bold)
-                        if isinstance(styled.loc[idx, col], str):
-                            continue
-                        color = 'green' if val >= thresh else 'red'
-                        fmt = format_value(val, metric)
-                        styled.loc[idx, col] = f"\\textcolor{{{color}}}{{{fmt}}}"
+                    styled.loc[idx, col] = f"\\textcolor{{{color}}}{{{fmt}}}"
     
     # Format remaining unstyled values
     for col in styled.columns:
@@ -677,9 +680,10 @@ def style_multiindex_latex(df, bold_metrics=None, threshold_metrics=None, decima
     
     # Generate LaTeX
     latex = styled.to_latex(escape=False, multirow=True, 
-                           column_format='l' + 'c'*len(df.columns))
+                           column_format='l' + 'r'*len(df.columns))
 
-    return latex
+    preamble = '\\definecolor{subtlegreen}{RGB}{34, 139, 34}'
+    return preamble + latex
 
 
 def plot_performance_datasets_table(df,
@@ -776,6 +780,8 @@ def plot_performance_datasets_table(df,
 
 
     # Usage
+    latex_output = '\\footnotesize\n' + latex_output 
+
     packages = ['booktabs', 'multirow', 'geometry', 'multirow', 'xcolor']
     output_pdf = 'table_preview.pdf'
     preview_latex(latex_output, packages, output_pdf)
