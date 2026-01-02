@@ -9,6 +9,7 @@ import math
 from pathlib import Path
 
 from src.utils.pareto import find_pareto_front
+from src.utils.latex import preview_latex
 
 log = structlog.get_logger()
 
@@ -603,6 +604,93 @@ def plot_performance_datasets(df,
 
     return g.figure
 
+
+def style_multiindex_latex(df, bold_metrics=None, threshold_metrics=None):
+    """
+    bold_metrics: dict like {'Accuracy': 'max', 'Loss': 'min'}
+    threshold_metrics: dict like {'Accuracy': 0.9, 'Loss': 0.1}
+
+    NOTE: require these packages. xcolor,booktabs,multirow
+    """
+
+    styled = df.copy()
+    
+    for exp in df.columns.get_level_values(0).unique():
+        # Bold best results
+        if bold_metrics:
+            for metric, mode in bold_metrics.items():
+                col = (exp, metric)
+                if col in df.columns:
+                    best_idx = df[col].idxmax() if mode == 'max' else df[col].idxmin()
+                    styled.loc[best_idx, col] = f"\\textbf{{{df.loc[best_idx, col]:.3f}}}"
+        
+        # Color by threshold
+        if threshold_metrics:
+            for metric, thresh in threshold_metrics.items():
+                col = (exp, metric)
+                if col in df.columns:
+                    for idx in styled.index:
+                        val = df.loc[idx, col]
+                        if isinstance(styled.loc[idx, col], str):  # Skip if already bolded
+                            continue
+                        color = 'green' if val >= thresh else 'red'
+                        styled.loc[idx, col] = f"\\textcolor{{{color}}}{{{val:.3f}}}"
+    
+    latex = styled.to_latex(escape=False, multirow=True, column_format='l' + 'c'*len(df.columns))
+
+    return latex
+
+
+def plot_performance_datasets_table(df,
+        path=None,
+        strategy_order=None,
+        experiment='min_samples_leaf_trees',
+        depth_limit='min_samples_leaf',
+        metric='test_roc_auc',
+        lower_performance_boundary=-1.0,
+    ):
+
+    if strategy_order is None:
+        strategy_order = DEFAULT_STRATEGY_ORDER
+
+    """
+    data = performance_comparison_datasets(df,
+        strategy_order=strategy_order,
+        experiment=experiment,
+        depth_limit=depth_limit,
+        metric=metric
+    )
+    """
+
+    # Example DataFrame with MultiIndex columns
+    df = pandas.DataFrame({
+        ('Exp1', 'Accuracy'): [0.95, 0.87, 0.92],
+        ('Exp1', 'Loss'): [0.05, 0.12, 0.08],
+        ('Exp2', 'Accuracy'): [0.88, 0.91, 0.85],
+        ('Exp2', 'Loss'): [0.11, 0.07, 0.13],
+    })
+    df.index = ['Model A', 'Model B', 'Model C']
+
+    print('Prep dataset')
+
+    # Usage
+    latex_output = style_multiindex_latex(
+        df,
+        bold_metrics={'Accuracy': 'max', 'Loss': 'min'},
+        threshold_metrics={'Accuracy': 0.9}
+    )
+
+
+    # Usage
+    packages = ['booktabs', 'multirow', 'geometry', 'multirow', 'xcolor']
+    output_pdf = 'table_preview.pdf'
+    preview_latex(latex_output, packages, output_pdf)
+    print('Wrote', output_pdf)
+
+    if path is not None:
+        open(path, 'w').write(latex_output)
+
+
 def enrich_results(df,
         leaf_node_bytes_default=4,
         decision_node_bytes_default = 8):
@@ -642,6 +730,7 @@ def comma_separated(s, delimiter=','):
     return tok
 
 ALL_PLOTS=[
+    'dataset_results_table',
     'dataset_results_pareto',
     'leaf_analysis',
     'overall_performance',
@@ -699,6 +788,9 @@ def main():
 
     if 'overall_performance' in args.plots:
         plot_overall_performance_vs_baseline(df, path='hyperparam-perfdrop-trees-strategies.png')
+
+    if 'dataset_results_table' in args.plots:
+        plot_performance_datasets_table(df, path='perf-dataset-table.tex')
 
     if 'dataset_results_pareto' in args.plots:
         plot_performance_datasets(df, path='perf-pareto-datasets.png')
