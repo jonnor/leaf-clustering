@@ -780,19 +780,9 @@ def plot_performance_datasets_table(df,
         )
         data.to_parquet(cached_path)
 
-    print('ss', data.shape)
 
     best = extract_best(data, lower_performance_boundary=lower_performance_boundary)
     #best = best.set_index('dataset')
-
-    print(best.columns)
-
-
-
-    #print(best.columns)
-
-    print(best.head()[['dataset', 'strategy', 'perf_change', 'size_saving', 'total_size']])
-
 
     pivot = best.pivot(
         index='dataset',
@@ -833,20 +823,18 @@ def plot_performance_datasets_table(df,
     pivot = pivot.sort_values(by=('majority', 'size_saving'), ascending=True)
 
     # Add summary rows
-
-    # Calculate average for size_saving columns only
+    # Calculate averages
     size_saving_cols = [col for col in pivot.columns if col[1] == 'size_saving']
     avg_row = pivot[size_saving_cols].mean().to_frame().T
     avg_row.index = ['Average']
 
-    # Calculate wins (best size_saving per row)
+    # Calculate wins
     best_per_row = pivot[size_saving_cols].idxmax(axis=1)
     wins_row = pandas.Series({col: (best_per_row == col).sum() for col in size_saving_cols}).to_frame().T
     wins_row.index = ['Wins']
 
     # Concatenate - missing columns automatically become NaN
     pivot = pandas.concat([pivot, avg_row, wins_row])
-
 
     #fig, ax = plt.subplots(
     #g = seaborn.relplot(kind='scatter', data=best, x='size_saving', y='perf_change', hue='strategy')
@@ -868,29 +856,28 @@ def plot_performance_datasets_table(df,
     g.figure.savefig('dis.png')
 
 
-
-    if True:
-        df = pivot
-
-        latex_output = style_multiindex_latex(
-            df,
-            bold_metrics={'size_saving': 'max'},
-            threshold_metrics={'perf_change': lower_performance_boundary},
-            decimal_places={'perf_change': 2, 'size_saving': 2, 'total_size': 0, 'leaf_bits': 0, 'leaves_per_class': 0 },
-            rename_metrics={'perf_change': 'Score', 'size_saving': 'Size', 'total_size': 'Size', 'leaf_bits': 'Bits', 'leaves_per_class': 'LC' },
-            summary_rows=['Average', 'Wins'],
-        )
+    latex_output = style_multiindex_latex(
+        pivot,
+        bold_metrics={'size_saving': 'max'},
+        threshold_metrics={'perf_change': lower_performance_boundary},
+        decimal_places={'perf_change': 2, 'size_saving': 2, 'total_size': 0, 'leaf_bits': 0, 'leaves_per_class': 0 },
+        rename_metrics={'perf_change': 'Score', 'size_saving': 'Size', 'total_size': 'Size', 'leaf_bits': 'Bits', 'leaves_per_class': 'LC' },
+        summary_rows=['Average', 'Wins'],
+    )
 
     # Usage
     latex_output = '\\footnotesize\n' + latex_output 
 
+    preview_path = os.path.splitext(path)[0]+'.pdf'
     packages = ['booktabs', 'multirow', 'geometry', 'multirow', 'xcolor']
     output_pdf = 'table_preview.pdf'
-    preview_latex(latex_output, packages, output_pdf)
-    print('Wrote', output_pdf)
 
     if path is not None:
         open(path, 'w').write(latex_output)
+        print('Wrote', path)
+        preview_latex(latex_output, packages, preview_path)
+        print('Wrote', preview_path)
+
 
 
 def enrich_results(df,
