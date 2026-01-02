@@ -14,9 +14,11 @@ log = structlog.get_logger()
 
 
 DEFAULT_STRATEGY_ORDER=[
-    'joint',
     'majority',
     'original',
+    'quantize',
+    'ClusterQ4',
+    'ClusterQ8',
 ]
 
 
@@ -102,8 +104,9 @@ def name_strategies(df):
     mm['strategy'] = 'other'
     mm.loc[mm.leaves_per_class.isna() & mm.leaf_bits.isna(), 'strategy'] = 'original'
     mm.loc[mm.leaves_per_class.isna() & (mm.leaf_bits.notna()), 'strategy'] = 'quantize'
-    mm.loc[mm.leaves_per_class.notna() & (mm.leaf_bits.isna()), 'strategy'] = 'cluster'
-    mm.loc[mm.leaves_per_class.notna() & (mm.leaf_bits.notna()), 'strategy'] = 'joint'
+    mm.loc[mm.leaves_per_class.notna() & (mm.leaf_bits.isna()), 'strategy'] = 'cluster-float'
+    mm.loc[mm.leaves_per_class.notna() & (mm.leaf_bits == 8), 'strategy'] = 'ClusterQ8'
+    mm.loc[mm.leaves_per_class.notna() & (mm.leaf_bits == 4), 'strategy'] = 'ClusterQ4'
     mm.loc[mm.leaves_per_class.isna() & (mm.leaf_bits == 0.0), 'strategy'] = 'majority'
 
     return mm
@@ -225,7 +228,6 @@ def compute_perf_change(df, reference,
     assert not df.empty
     assert not reference.empty
     ref_df = reference.reset_index().groupby(groupby).median(numeric_only=True)
-    
 
     print(ref_df.head())
 
@@ -409,16 +411,17 @@ def aggregated_performance(df,
         agg='median',
         folds = 5,
         repetitions = 1,
-        metrics = ['perf_change', 'total_size']
+        metrics = ['perf_change', 'total_size'],
+        check_groups_same=True,
     ):
     results_per_group = repetitions * folds
 
-    # TODO: only user dataset,strategy
     groupby = [
         'dataset',
         'strategy',
         'min_samples_leaf',
-        #'trees',
+        'leaf_bits',
+        'trees',
         'leaves_per_class'
     ]
 
@@ -429,11 +432,16 @@ def aggregated_performance(df,
 
     # check that we got all the results / have specified the groups correctly
     for idx, g in groups:
+        if len(g) == 0:
+            print('Empty group', idx)
+            continue
+
         mismatch = len(g) != results_per_group
 
         leaf_bits_values = df.leaf_bits.unique()
 
-        if mismatch:
+        if mismatch and check_groups_same:
+            print('Group mismatch')
             print(idx, len(g))
             print(g['id'].nunique())
             print(g['run'].unique())
@@ -445,69 +453,92 @@ def aggregated_performance(df,
     return out
 
 
-def plot_performance_datasets(df,
-    path=None,
-    strategy_order=None,
-    experiment='min_samples_leaf_trees10',
-    depth_limit='min_samples_leaf',
+def performance_comparison_datasets(df,
+        strategy_order=None,
+        experiment=None,
+        depth_limit=None,
+        metric=None,
     ):
-
-    if strategy_order is None:
-        strategy_order = DEFAULT_STRATEGY_ORDER
 
     # XXX: maybe move this outside, shoud be shared for consistency?
     df = name_strategies(df)
 
-    # FIXME: use best-hyperparam for each dataset as the reference
+    data = df.copy()
+    #data = data.reset_index()
+    data = data[data.experiment.str.contains(experiment)]
+    data = data[data.strategy.isin(strategy_order)]
+
+    print(df.strategy.value_counts())
+
+    # Use best-hyperparam for each dataset as the reference
     #reference_experiment = 'sklearn_default_int16'
     is_ref = (
         df.experiment.str.contains(experiment) &
         df.leaf_bits.isna() &
         df.leaves_per_class.isna()
     )
-    ref = df[is_ref]
-    #ref = df[df.experiment.str.contains(reference_experiment)]
+    #ref = df[is_ref]
+    ref = data[data.strategy == 'original']
+    ref = aggregated_performance(ref, metrics=[metric, 'total_size'])
+    ref = ref.loc[ref.groupby('dataset')[metric].idxmax()]
 
-    data = df.copy() # reset_index()
-    data = data[data.experiment.str.contains(experiment)]
-    data = data[data.strategy.isin(strategy_order)]
+    print(df.strategy.value_counts())
 
     # drop the different quantization options
-    data = data[data.leaf_bits != 8]
+    #data = data[data.leaf_bits != 8]
     #data = data[data.leaf_bits.isin([None, 8, 0])]
 
     # Sanity checks
     assert not ref.empty
-    assert ref.trees.unique() == [10]
-    #assert ref[depth_limit].unique() == [1]
+    assert len(ref) == data.dataset.nunique(), len(ref)
 
     # should be for a single tree
     n_trees = data.trees.unique()
-    assert len(n_trees) == 1, n_trees
+    #assert len(n_trees) == 1, n_trees
 
     # Compute changes wrt baseline/reference
     data = compute_perf_change(data, ref)
 
     # Aggregate over the folds/repretitions
     data = aggregated_performance(data)
-    data = data.sort_values('dataset', ascending=False)
+    data = data.sort_values(['dataset', 'strategy', 'perf_change'], ascending=False)
+    
+    return data
 
-    def find_pareto(df,
-        cost_metric='total_size',
-        performance_metric='perf_change',
-        min_performance=-10.0,
-        ):
+def find_pareto(df,
+    cost_metric='total_size',
+    performance_metric='perf_change',
+    min_performance=-10.0,
+    ):
 
-        pareto_params = dict(
-            cost_metric=cost_metric,
-            performance_metric=performance_metric,
-            min_performance=min_performance,
-        )
-        
-        pf = find_pareto_front(df, **pareto_params)
-        pf['point'] = numpy.arange(len(pf))
-        pf = pf.set_index('point')
-        return pf
+    pareto_params = dict(
+        cost_metric=cost_metric,
+        performance_metric=performance_metric,
+        min_performance=min_performance,
+    )
+    
+    pf = find_pareto_front(df, **pareto_params)
+    pf['point'] = numpy.arange(len(pf))
+    pf = pf.set_index('point')
+    return pf
+
+def plot_performance_datasets(df,
+        path=None,
+        strategy_order=None,
+        experiment='min_samples_leaf_trees',
+        depth_limit='min_samples_leaf',
+        metric='test_roc_auc',
+    ):
+
+    if strategy_order is None:
+        strategy_order = DEFAULT_STRATEGY_ORDER
+
+    data = performance_comparison_datasets(df,
+        strategy_order=strategy_order,
+        experiment=experiment,
+        depth_limit=depth_limit,
+        metric=metric
+    )
 
     # Plot pareto front as lines
     pareto = data.groupby(['dataset', 'strategy'], as_index=True).apply(find_pareto)
@@ -539,19 +570,19 @@ def plot_performance_datasets(df,
             hue_order=strategy_order,
             alpha=0.5,
             legend=False,
-            s=5.0,
+            s=8.0,
             zorder=1,
         )
         
     # Configure scale
     g.set(xscale="log")
     g.set(ylim=(-10, 5))
-    g.set(xlim=(100, 100e3))
+    g.set(xlim=(10, 100e3))
     g.refline(y=0.0, ls='-', color='black', alpha=0.5, lw=1.0)
 
     # Configure legend
     g.figure.legends = []
-    g.figure.legend(loc="upper center", ncol=3)
+    g.figure.legend(loc="upper center", ncol=6)
     g.figure.tight_layout()
 
     # Configure grid
@@ -577,8 +608,10 @@ def enrich_results(df,
         decision_node_bytes_default = 8):
 
     # compute storage size
-    leaf_bytes_per_class = numpy.ceil(df['leaf_bits'] / 8) # NOTE: no bit-packing, full bytes
-    leaf_bytes_per_class = leaf_bytes_per_class.fillna(value=leaf_node_bytes_default).astype(int)
+    #leaf_bytes_per_class = numpy.ceil(df['leaf_bits'] / 8) # NOTE: no bit-packing, full bytes
+    leaf_bytes_per_class = numpy.ceil((2*df['leaf_bits'])/8)*2 # support bit-packing 2x4 bits into 1 byte
+
+    leaf_bytes_per_class = leaf_bytes_per_class.fillna(value=leaf_node_bytes_default).astype(float)
 
     decision_node_bytes = df['dtype'].map({'int16': 2, 'float': 4})
     missing_decision_node_bytes = decision_node_bytes[decision_node_bytes.isna()]
