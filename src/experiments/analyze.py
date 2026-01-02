@@ -840,20 +840,6 @@ def plot_performance_datasets_table(df,
     #g = seaborn.relplot(kind='scatter', data=best, x='size_saving', y='perf_change', hue='strategy')
     #g.figure.savefig('scatter.png')
 
-    # FIXME: use same order/colors as rest
-    g = seaborn.displot(kind="ecdf",
-        data=best, x='size_saving',
-        hue='strategy',
-        aspect=2.0,
-        height=3.0,
-    )   
-    g.set(xlim=(0, 10.0))
-    #g.refline(x=1.0, lw=2.0, ls='--', color='black')
-
-    for i, ax in enumerate(g.axes.flatten()):
-        ax.grid()
- 
-    g.figure.savefig('dis.png')
 
 
     latex_output = style_multiindex_latex(
@@ -877,6 +863,53 @@ def plot_performance_datasets_table(df,
         print('Wrote', path)
         preview_latex(latex_output, packages, preview_path)
         print('Wrote', preview_path)
+
+
+def plot_size_comparison(df,
+        path=None,
+        strategy_order=None,
+        experiment='min_samples_leaf_trees',
+        depth_limit='min_samples_leaf',
+        metric='test_roc_auc',
+        lower_performance_boundary=-1.0,
+    ):
+
+    if strategy_order is None:
+        strategy_order = DEFAULT_STRATEGY_ORDER
+
+    # XXX: this is slows, so caching is useful for rapid iteration
+    cached_path = 'foo.parquet'
+
+    if os.path.exists(cached_path):
+        data = pandas.read_parquet(cached_path)
+    else:
+        data = performance_comparison_datasets(df,
+            strategy_order=strategy_order,
+            experiment=experiment,
+            depth_limit=depth_limit,
+            metric=metric
+        )
+        data.to_parquet(cached_path)
+
+
+    best = extract_best(data, lower_performance_boundary=lower_performance_boundary)
+
+    # FIXME: use same order/colors as rest
+    g = seaborn.displot(kind="ecdf",
+        data=best, x='size_saving',
+        hue='strategy',
+        aspect=2.0,
+        height=3.0,
+    )   
+    g.set(xlim=(0, 10.0))
+    #g.refline(x=1.0, lw=2.0, ls='--', color='black')
+
+    for i, ax in enumerate(g.axes.flatten()):
+        ax.grid()
+ 
+    if path is not None:
+        g.figure.savefig(path)
+        print('Wrote', path)
 
 
 
@@ -919,6 +952,7 @@ def comma_separated(s, delimiter=','):
     return tok
 
 ALL_PLOTS=[
+    'size_comparison',
     'dataset_results_table',
     'dataset_results_pareto',
     'leaf_analysis',
@@ -983,6 +1017,10 @@ def main():
 
     if 'dataset_results_pareto' in args.plots:
         plot_performance_datasets(df, path='perf-pareto-datasets.png')
+
+    if 'size_comparison' in args.plots:
+        plot_size_comparison(df, path='size-savings-datasets.png')
+
 
     if 'leaf_analysis' in args.plots:
         plot_leaf_size_proportion(df, path='leaf-proportion.png')
