@@ -4,6 +4,7 @@ import pandas
 import structlog
 import numpy
 
+import os.path
 import uuid
 import math
 from pathlib import Path
@@ -15,11 +16,11 @@ log = structlog.get_logger()
 
 
 DEFAULT_STRATEGY_ORDER=[
-    'majority',
     'original',
+    'majority',
     'quantize',
-    'ClusterQ4',
     'ClusterQ8',
+    'ClusterQ4',
 ]
 
 
@@ -605,7 +606,7 @@ def plot_performance_datasets(df,
     return g.figure
 
 
-def style_multiindex_latex(df, bold_metrics=None, threshold_metrics=None):
+def style_multiindex_latex(df, bold_metrics=None, threshold_metrics=None, decimal_places=None, rename_metrics=None):
     """
     bold_metrics: dict like {'Accuracy': 'max', 'Loss': 'min'}
     threshold_metrics: dict like {'Accuracy': 0.9, 'Loss': 0.1}
@@ -614,7 +615,15 @@ def style_multiindex_latex(df, bold_metrics=None, threshold_metrics=None):
     """
 
     styled = df.copy()
+    decimal_places = decimal_places or {}
+    rename_metrics = rename_metrics or {}
+
+    def format_value(val, metric):
+        """Format value based on metric's decimal places"""
+        decimals = decimal_places.get(metric, 3)  # default 3 decimals
+        return f"{val:.{decimals}f}"
     
+    # Apply styling to values
     for exp in df.columns.get_level_values(0).unique():
         # Bold best results
         if bold_metrics:
@@ -622,7 +631,9 @@ def style_multiindex_latex(df, bold_metrics=None, threshold_metrics=None):
                 col = (exp, metric)
                 if col in df.columns:
                     best_idx = df[col].idxmax() if mode == 'max' else df[col].idxmin()
-                    styled.loc[best_idx, col] = f"\\textbf{{{df.loc[best_idx, col]:.3f}}}"
+                    val = df.loc[best_idx, col]
+                    fmt = format_value(val, metric)
+                    styled.loc[best_idx, col] = f"\\textbf{{{fmt}}}"
         
         # Color by threshold
         if threshold_metrics:
@@ -631,12 +642,42 @@ def style_multiindex_latex(df, bold_metrics=None, threshold_metrics=None):
                 if col in df.columns:
                     for idx in styled.index:
                         val = df.loc[idx, col]
-                        if isinstance(styled.loc[idx, col], str):  # Skip if already bolded
+                        # Skip if already styled (bold)
+                        if isinstance(styled.loc[idx, col], str):
                             continue
                         color = 'green' if val >= thresh else 'red'
-                        styled.loc[idx, col] = f"\\textcolor{{{color}}}{{{val:.3f}}}"
+                        fmt = format_value(val, metric)
+                        styled.loc[idx, col] = f"\\textcolor{{{color}}}{{{fmt}}}"
     
-    latex = styled.to_latex(escape=False, multirow=True, column_format='l' + 'c'*len(df.columns))
+    # Format remaining unstyled values
+    for col in styled.columns:
+        metric = col[1] if isinstance(col, tuple) else col
+        for idx in styled.index:
+            if not isinstance(styled.loc[idx, col], str):
+                val = df.loc[idx, col]
+                styled.loc[idx, col] = format_value(val, metric)
+    
+    # Rename columns
+    if rename_metrics:
+        styled.columns = styled.columns.map(
+            lambda x: (x[0], rename_metrics.get(x[1], x[1])) 
+            if isinstance(x, tuple) 
+            else rename_metrics.get(x, x)
+        )
+    
+    # Escape underscores in column names
+    styled.columns = styled.columns.map(
+        lambda x: (x[0].replace('_', '\\_'), x[1].replace('_', '\\_')) 
+        if isinstance(x, tuple) 
+        else str(x).replace('_', '\\_')
+    )
+    
+    # Escape underscores in index
+    styled.index = styled.index.map(lambda x: str(x).replace('_', '\\_'))
+    
+    # Generate LaTeX
+    latex = styled.to_latex(escape=False, multirow=True, 
+                           column_format='l' + 'c'*len(df.columns))
 
     return latex
 
@@ -653,32 +694,85 @@ def plot_performance_datasets_table(df,
     if strategy_order is None:
         strategy_order = DEFAULT_STRATEGY_ORDER
 
-    """
-    data = performance_comparison_datasets(df,
-        strategy_order=strategy_order,
-        experiment=experiment,
-        depth_limit=depth_limit,
-        metric=metric
+    cached_path = 'foo.parquet'
+
+    if os.path.exists(cached_path):
+        data = pandas.read_parquet(cached_path)
+    else:
+        data = performance_comparison_datasets(df,
+            strategy_order=strategy_order,
+            experiment=experiment,
+            depth_limit=depth_limit,
+            metric=metric
+        )
+        data.to_parquet(cached_path)
+
+    print('ss', data.shape)
+
+
+    dfs = []
+    for (dataset, strategy), df in data.groupby(['dataset', 'strategy']):
+
+        # Find the smallest models with performance above threshold
+        # - else the model closest to the threshold
+        filtered = df[df['perf_change'] >= lower_performance_boundary]
+        result = (filtered.nsmallest(1, 'total_size', keep='all').nlargest(1, 'perf_change') 
+                  if not filtered.empty 
+                  else df.nlargest(1, 'perf_change')).reset_index()
+
+        #print(dataset, strategy, df.shape)
+        #print(result)
+        #print(
+        dfs.append(result)
+
+    
+    best = pandas.concat(dfs, ignore_index=True)
+    best['perf_change'] = best['perf_change'].round(2)
+    best['total_size'] = best['total_size'].round(0)
+
+    #print(best.columns)
+
+    print(best.head()[['dataset', 'strategy', 'perf_change', 'total_size']])
+
+    pivot = best.pivot(
+        index='dataset',
+        columns='strategy',
+        values=['perf_change', 'total_size']
     )
-    """
 
-    # Example DataFrame with MultiIndex columns
-    df = pandas.DataFrame({
-        ('Exp1', 'Accuracy'): [0.95, 0.87, 0.92],
-        ('Exp1', 'Loss'): [0.05, 0.12, 0.08],
-        ('Exp2', 'Accuracy'): [0.88, 0.91, 0.85],
-        ('Exp2', 'Loss'): [0.11, 0.07, 0.13],
-    })
-    df.index = ['Model A', 'Model B', 'Model C']
+    #print(pivot)
 
-    print('Prep dataset')
+    pivot = pivot.swaplevel(axis=1).sort_index(axis=1)
+    pivot = pivot[strategy_order]
 
-    # Usage
-    latex_output = style_multiindex_latex(
-        df,
-        bold_metrics={'Accuracy': 'max', 'Loss': 'min'},
-        threshold_metrics={'Accuracy': 0.9}
-    )
+    print(pivot)
+
+    if True:
+        df = pivot
+
+        latex_output = style_multiindex_latex(
+            df,
+            bold_metrics={'total_size': 'min'},
+            threshold_metrics={'perf_change': lower_performance_boundary},
+            decimal_places={'perf_change': 2, 'total_size': 0},
+            rename_metrics={'perf_change': 'Score', 'total_size': 'Size'},
+        )
+
+    else:
+        # Example DataFrame with MultiIndex columns
+        df = pandas.DataFrame({
+            ('Exp1', 'Accuracy'): [0.95, 0.87, 0.92],
+            ('Exp1', 'Loss'): [0.05, 0.12, 0.08],
+            ('Exp2', 'Accuracy'): [0.88, 0.91, 0.85],
+            ('Exp2', 'Loss'): [0.11, 0.07, 0.13],
+        })
+        df.index = ['Model A', 'Model B', 'Model C']
+
+        latex_output = style_multiindex_latex(
+            df,
+            bold_metrics={'Accuracy': 'max', 'Loss': 'min'},
+            threshold_metrics={'Accuracy': 0.9}
+        )
 
 
     # Usage
