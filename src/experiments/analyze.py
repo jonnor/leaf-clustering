@@ -606,11 +606,14 @@ def plot_performance_datasets(df,
     return g.figure
 
 
-def style_multiindex_latex(df, bold_metrics=None, threshold_metrics=None, decimal_places=None, rename_metrics=None):
+def style_multiindex_latex(df,
+        bold_metrics=None,
+        threshold_metrics=None,
+        decimal_places=None,
+        rename_metrics=None,
+        summary_rows=[],
+    ):
     """
-    bold_metrics: dict like {'Accuracy': 'max', 'Loss': 'min'}
-    threshold_metrics: dict like {'Accuracy': 0.9, 'Loss': 0.1}
-
     NOTE: require these packages. xcolor,booktabs,multirow
     """
 
@@ -620,7 +623,9 @@ def style_multiindex_latex(df, bold_metrics=None, threshold_metrics=None, decima
 
     def format_value(val, metric):
         """Format value based on metric's decimal places"""
-        decimals = decimal_places.get(metric, 3)  # default 3 decimals
+        if pandas.isna(val):
+            return ''  # Empty string instead of 'nan'
+        decimals = decimal_places.get(metric, 2)
         return f"{val:.{decimals}f}"
     
     # Bold best results per row for each metric
@@ -678,41 +683,40 @@ def style_multiindex_latex(df, bold_metrics=None, threshold_metrics=None, decima
     # Escape underscores in index
     styled.index = styled.index.map(lambda x: str(x).replace('_', '\\_'))
     
+
+    # Create column format with vertical lines between experiments
+    experiments = df.columns.get_level_values(0).unique()
+    col_groups = []
+    for exp in experiments:
+        # Count metrics for this experiment
+        num_cols = sum(df.columns.get_level_values(0) == exp)
+        col_groups.append('r' * num_cols)
+    # 'l' for index, then groups separated by |
+    col_format = 'l|' + '|'.join(col_groups) + '|'
+    
     # Generate LaTeX
-    latex = styled.to_latex(escape=False, multirow=True, 
-                           column_format='l' + 'r'*len(df.columns))
+    latex_table = styled.to_latex(escape=False, multirow=True, 
+                                  column_format=col_format)
+
+    # Add horizontal line before summary rows if specified
+    if summary_rows:
+        lines = latex_table.split('\n')
+        new_lines = []
+        for i, line in enumerate(lines):
+            # Check if this line contains any summary row
+            if any(row.replace('_', '\\_') in line for row in summary_rows):
+                # Add midrule before first summary row
+                if i > 0 and '\\midrule' not in new_lines[-1]:
+                    new_lines.append('\\midrule')
+            new_lines.append(line)
+        latex_table = '\n'.join(new_lines)
+
 
     preamble = '\\definecolor{subtlegreen}{RGB}{34, 139, 34}'
-    return preamble + latex
+    return preamble + latex_table
 
 
-def plot_performance_datasets_table(df,
-        path=None,
-        strategy_order=None,
-        experiment='min_samples_leaf_trees',
-        depth_limit='min_samples_leaf',
-        metric='test_roc_auc',
-        lower_performance_boundary=-1.0,
-    ):
-
-    if strategy_order is None:
-        strategy_order = DEFAULT_STRATEGY_ORDER
-
-    cached_path = 'foo.parquet'
-
-    if os.path.exists(cached_path):
-        data = pandas.read_parquet(cached_path)
-    else:
-        data = performance_comparison_datasets(df,
-            strategy_order=strategy_order,
-            experiment=experiment,
-            depth_limit=depth_limit,
-            metric=metric
-        )
-        data.to_parquet(cached_path)
-
-    print('ss', data.shape)
-
+def extract_best(data, lower_performance_boundary, reference='original'):
 
     dfs = []
     for (dataset, strategy), df in data.groupby(['dataset', 'strategy']):
@@ -731,53 +735,151 @@ def plot_performance_datasets_table(df,
 
     
     best = pandas.concat(dfs, ignore_index=True)
+
+    # Compute size_saving, wrt baseline
+    baseline = best[best['strategy'] == reference][['dataset', 'total_size']].rename(
+        columns={'total_size': 'baseline_size'}
+    )
+    best = best.merge(baseline, on='dataset')
+    #best['size_saving'] = ((best['baseline_size'] - best['total_size']) / best['baseline_size']) * 100
+
+    best['size_saving'] = best['baseline_size'] / best['total_size'] 
+    #best['size_saving'] = best['total_size'] / best['baseline_size']
+
+    best = best.drop(columns=['baseline_size'])
+
     best['perf_change'] = best['perf_change'].round(2)
     best['total_size'] = best['total_size'].round(0)
+    best['size_saving'] = best['size_saving'].round(2)
+
+    return best
+
+def plot_performance_datasets_table(df,
+        path=None,
+        strategy_order=None,
+        experiment='min_samples_leaf_trees',
+        depth_limit='min_samples_leaf',
+        metric='test_roc_auc',
+        lower_performance_boundary=-1.0,
+    ):
+
+    if strategy_order is None:
+        strategy_order = DEFAULT_STRATEGY_ORDER
+
+    # XXX: this is slows, so caching is useful for rapid iteration
+    cached_path = 'foo.parquet'
+
+    if os.path.exists(cached_path):
+        data = pandas.read_parquet(cached_path)
+    else:
+        data = performance_comparison_datasets(df,
+            strategy_order=strategy_order,
+            experiment=experiment,
+            depth_limit=depth_limit,
+            metric=metric
+        )
+        data.to_parquet(cached_path)
+
+    print('ss', data.shape)
+
+    best = extract_best(data, lower_performance_boundary=lower_performance_boundary)
+    #best = best.set_index('dataset')
+
+    print(best.columns)
+
+
 
     #print(best.columns)
 
-    print(best.head()[['dataset', 'strategy', 'perf_change', 'total_size']])
+    print(best.head()[['dataset', 'strategy', 'perf_change', 'size_saving', 'total_size']])
+
 
     pivot = best.pivot(
         index='dataset',
         columns='strategy',
-        values=['perf_change', 'total_size']
+        values=['perf_change', 'size_saving', 'leaf_bits', 'leaves_per_class']
     )
 
     #print(pivot)
 
     pivot = pivot.swaplevel(axis=1).sort_index(axis=1)
+    # Ensure consistent order for experiments
     pivot = pivot[strategy_order]
 
-    print(pivot)
+    # Drop not-so-useful
+    pivot = pivot.drop(columns=[
+        ('original', 'leaf_bits'),
+        ('majority', 'leaf_bits'),
+        ('ClusterQ4', 'leaf_bits'),
+        ('ClusterQ8', 'leaf_bits'),
+    ])
+
+    pivot = pivot.drop(columns=[
+        #('original', 'size_saving'),
+        ('original', 'leaves_per_class'),
+        ('majority', 'leaves_per_class'),
+        ('quantize', 'leaves_per_class'),
+    ])
+
+    # Ensure consistent column order for metrics
+    all_metrics = pivot.columns.get_level_values(1).unique().tolist()
+    for m in ['perf_change', 'size_saving']:
+        if m in all_metrics:
+            all_metrics.remove(m)
+    metric_order = ['perf_change', 'size_saving'] + all_metrics
+    pivot = pivot.reindex(metric_order, level=1, axis=1)
+
+    # Ensure a consistent ordering of rows
+    pivot = pivot.sort_values(by=('majority', 'size_saving'), ascending=True)
+
+    # Add summary rows
+
+    # Calculate average for size_saving columns only
+    size_saving_cols = [col for col in pivot.columns if col[1] == 'size_saving']
+    avg_row = pivot[size_saving_cols].mean().to_frame().T
+    avg_row.index = ['Average']
+
+    # Calculate wins (best size_saving per row)
+    best_per_row = pivot[size_saving_cols].idxmax(axis=1)
+    wins_row = pandas.Series({col: (best_per_row == col).sum() for col in size_saving_cols}).to_frame().T
+    wins_row.index = ['Wins']
+
+    # Concatenate - missing columns automatically become NaN
+    pivot = pandas.concat([pivot, avg_row, wins_row])
+
+
+    #fig, ax = plt.subplots(
+    #g = seaborn.relplot(kind='scatter', data=best, x='size_saving', y='perf_change', hue='strategy')
+    #g.figure.savefig('scatter.png')
+
+    # FIXME: use same order/colors as rest
+    g = seaborn.displot(kind="ecdf",
+        data=best, x='size_saving',
+        hue='strategy',
+        aspect=2.0,
+        height=3.0,
+    )   
+    g.set(xlim=(0, 10.0))
+    #g.refline(x=1.0, lw=2.0, ls='--', color='black')
+
+    for i, ax in enumerate(g.axes.flatten()):
+        ax.grid()
+ 
+    g.figure.savefig('dis.png')
+
+
 
     if True:
         df = pivot
 
         latex_output = style_multiindex_latex(
             df,
-            bold_metrics={'total_size': 'min'},
+            bold_metrics={'size_saving': 'max'},
             threshold_metrics={'perf_change': lower_performance_boundary},
-            decimal_places={'perf_change': 2, 'total_size': 0},
-            rename_metrics={'perf_change': 'Score', 'total_size': 'Size'},
+            decimal_places={'perf_change': 2, 'size_saving': 2, 'total_size': 0, 'leaf_bits': 0, 'leaves_per_class': 0 },
+            rename_metrics={'perf_change': 'Score', 'size_saving': 'Size', 'total_size': 'Size', 'leaf_bits': 'Bits', 'leaves_per_class': 'LC' },
+            summary_rows=['Average', 'Wins'],
         )
-
-    else:
-        # Example DataFrame with MultiIndex columns
-        df = pandas.DataFrame({
-            ('Exp1', 'Accuracy'): [0.95, 0.87, 0.92],
-            ('Exp1', 'Loss'): [0.05, 0.12, 0.08],
-            ('Exp2', 'Accuracy'): [0.88, 0.91, 0.85],
-            ('Exp2', 'Loss'): [0.11, 0.07, 0.13],
-        })
-        df.index = ['Model A', 'Model B', 'Model C']
-
-        latex_output = style_multiindex_latex(
-            df,
-            bold_metrics={'Accuracy': 'max', 'Loss': 'min'},
-            threshold_metrics={'Accuracy': 0.9}
-        )
-
 
     # Usage
     latex_output = '\\footnotesize\n' + latex_output 
